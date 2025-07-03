@@ -1,0 +1,25 @@
+[0.818s] Invoking command in '/home/mohsin/official_build/ros2_ws/src/perception': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PS1=(venv) \[\e]0;\u@\h: \w\a\]${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ PYTHONPATH=/home/mohsin/official_build/ros2_ws/build/perception/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/mohsin/official_build/ros2_ws/install/perception/lib/python3.12/site-packages:${PYTHONPATH} VIRTUAL_ENV_PROMPT=(venv) /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/perception build --build-base /home/mohsin/official_build/ros2_ws/build/perception/build install --record /home/mohsin/official_build/ros2_ws/build/perception/install.log --single-version-externally-managed install_data
+[1.148s] running egg_info
+[1.169s] writing ../../build/perception/perception.egg-info/PKG-INFO
+[1.169s] writing dependency_links to ../../build/perception/perception.egg-info/dependency_links.txt
+[1.169s] writing entry points to ../../build/perception/perception.egg-info/entry_points.txt
+[1.169s] writing requirements to ../../build/perception/perception.egg-info/requires.txt
+[1.169s] writing top-level names to ../../build/perception/perception.egg-info/top_level.txt
+[1.210s] reading manifest file '../../build/perception/perception.egg-info/SOURCES.txt'
+[1.211s] adding license file 'LICENSE'
+[1.211s] writing manifest file '../../build/perception/perception.egg-info/SOURCES.txt'
+[1.211s] running build
+[1.211s] running build_py
+[1.212s] running install
+[1.217s] running install_lib
+[1.238s] running install_data
+[1.238s] running install_egg_info
+[1.259s] removing '/home/mohsin/official_build/ros2_ws/install/perception/lib/python3.12/site-packages/perception-0.0.0-py3.12.egg-info' (and everything under it)
+[1.259s] Copying ../../build/perception/perception.egg-info to /home/mohsin/official_build/ros2_ws/install/perception/lib/python3.12/site-packages/perception-0.0.0-py3.12.egg-info
+[1.260s] running install_scripts
+[1.390s] Installing opencv_camera_node script to /home/mohsin/official_build/ros2_ws/install/perception/lib/perception
+[1.391s] Installing opencv_yolo script to /home/mohsin/official_build/ros2_ws/install/perception/lib/perception
+[1.391s] Installing pose_node script to /home/mohsin/official_build/ros2_ws/install/perception/lib/perception
+[1.391s] Installing yolo_node script to /home/mohsin/official_build/ros2_ws/install/perception/lib/perception
+[1.391s] writing list of installed files to '/home/mohsin/official_build/ros2_ws/build/perception/install.log'
+[1.420s] Invoked command in '/home/mohsin/official_build/ros2_ws/src/perception' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PS1=(venv) \[\e]0;\u@\h: \w\a\]${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ PYTHONPATH=/home/mohsin/official_build/ros2_ws/build/perception/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/mohsin/official_build/ros2_ws/install/perception/lib/python3.12/site-packages:${PYTHONPATH} VIRTUAL_ENV_PROMPT=(venv) /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/perception build --build-base /home/mohsin/official_build/ros2_ws/build/perception/build install --record /home/mohsin/official_build/ros2_ws/build/perception/install.log --single-version-externally-managed install_data

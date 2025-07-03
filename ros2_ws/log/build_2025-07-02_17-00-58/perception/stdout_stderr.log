@@ -1,0 +1,26 @@
+running egg_info
+writing ../../build/perception/perception.egg-info/PKG-INFO
+writing dependency_links to ../../build/perception/perception.egg-info/dependency_links.txt
+writing entry points to ../../build/perception/perception.egg-info/entry_points.txt
+writing requirements to ../../build/perception/perception.egg-info/requires.txt
+writing top-level names to ../../build/perception/perception.egg-info/top_level.txt
+reading manifest file '../../build/perception/perception.egg-info/SOURCES.txt'
+adding license file 'LICENSE'
+writing manifest file '../../build/perception/perception.egg-info/SOURCES.txt'
+running build
+running build_py
+copying perception/yolo_object_detection.py -> /home/mohsin/official_build/ros2_ws/build/perception/build/lib/perception
+running install
+running install_lib
+copying /home/mohsin/official_build/ros2_ws/build/perception/build/lib/perception/yolo_object_detection.py -> /home/mohsin/official_build/ros2_ws/install/perception/lib/python3.12/site-packages/perception
+byte-compiling /home/mohsin/official_build/ros2_ws/install/perception/lib/python3.12/site-packages/perception/yolo_object_detection.py to yolo_object_detection.cpython-312.pyc
+running install_data
+running install_egg_info
+removing '/home/mohsin/official_build/ros2_ws/install/perception/lib/python3.12/site-packages/perception-0.0.0-py3.12.egg-info' (and everything under it)
+Copying ../../build/perception/perception.egg-info to /home/mohsin/official_build/ros2_ws/install/perception/lib/python3.12/site-packages/perception-0.0.0-py3.12.egg-info
+running install_scripts
+Installing opencv_camera_node script to /home/mohsin/official_build/ros2_ws/install/perception/lib/perception
+Installing opencv_yolo script to /home/mohsin/official_build/ros2_ws/install/perception/lib/perception
+Installing pose_node script to /home/mohsin/official_build/ros2_ws/install/perception/lib/perception
+Installing yolo_node script to /home/mohsin/official_build/ros2_ws/install/perception/lib/perception
+writing list of installed files to '/home/mohsin/official_build/ros2_ws/build/perception/install.log'
