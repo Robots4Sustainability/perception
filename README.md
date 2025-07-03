@@ -48,7 +48,7 @@ cd your-repo
    pip install -r requirements.txt
    ```
 
-4. Download the dataset from the [Releases](https://github.com/your-username/your-repo/releases) page.
+4. Download the dataset from the [Releases](https://github.com/Robots4Sustainability/perception/releases/tag/v1.0.0) page.
 
 5. Run `main.ipynb`:
    - Renames files (if needed)
