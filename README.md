@@ -108,6 +108,7 @@ colcon build
 source install/setup.bash
 ```
 
+
 ### Build `ros2_ws`
 ```bash
 cd ros2_ws
@@ -137,12 +138,42 @@ ros2 launch realsense2_camera rs_launch.py \
 Left Arm IP: 192.168.1.10
 Right Arm IP: 192.168.1.12
 
+This is a necessary package for the kinova vision camera
+```bash
+sudo apt update
+sudo apt install ros-jazzy-image-pipeline
+```
+
+For Kinova Vision Node, you must `export RMW_IMPLEMENTATION=rmw_zenoh_cpp` in every terminal, but before that
+Follow the instructions below:
+```bash
+sudo apt install ros-jazzy-rmw-zenoh-cpp
+
+pkill -9 -f ros && ros2 daemon stop
+```
+![Install Zenoh router](https://zenoh.io/docs/getting-started/installation/) and then `source /opt/ros/jazzy/setup.bash`
+
+```bash
+# terminal 1
+ros2 run rmw_zenoh_cpp rmw_zenohd
+
+
+# terminal 2
+export RMW_IMPLEMENTATION=rmw_zenoh_cpp
+
+your kinova vision node
+```
+
+Command to run kinova_vision.lanch
+
 ```bash
 ros2 launch kinova_vision kinova_vision.launch.py \
   device:=192.168.1.12 \
   depth_registration:=true \
   color_camera_info_url:=package://kinova_vision/launch/calibration/default_color_calib_1280x720.ini
 ```
+
+If you get resolution errors then, go to the admin portal of the arm(192.168.1.1X) and then in the Camera settings, set the calibration to 1280x720
 
 ---
 
