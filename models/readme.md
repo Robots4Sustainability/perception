@@ -1,0 +1,1 @@
+Place the folder model into <your_ros_workspace>/
