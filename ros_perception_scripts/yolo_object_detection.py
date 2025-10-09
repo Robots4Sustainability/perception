@@ -23,8 +23,10 @@ class YoloDetectorNode(Node):
         input_mode = self.get_parameter('input_mode').get_parameter_value().string_value
 
         # Determine model path
-        if model_type == 'fine_tuned':
+        if model_type == 'car':
             model_path = '/home/mohsin/official_build/ros2_ws/models/fine_tuned.pt'
+        elif model_type == "screw":
+            model_path = '/home/mohsin/official_build/ros2_ws/models/screw.pt'
         else:
             model_path = '/home/mohsin/official_build/ros2_ws/models/yolov8n.pt'
 
@@ -45,7 +47,11 @@ class YoloDetectorNode(Node):
         # Create subscriptions and publishers
         self.image_sub = self.create_subscription(Image, image_topic, self.image_callback, 10)
         self.annotated_image_pub = self.create_publisher(Image, '/annotated_image', 10)
-        self.detection_pub = self.create_publisher(Detection2DArray, '/detections', 10)
+        
+        if model_type == "screw":
+            self.detection_pub = self.create_publisher(Detection2DArray, '/screw_detections', 10)
+        else:
+            self.detection_pub = self.create_publisher(Detection2DArray, '/detections', 10)
 
         self.conf_threshold = 0.6  # Confidence threshold for filtering
 
