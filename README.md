@@ -179,18 +179,25 @@ If you get resolution errors then, go to the admin portal of the arm(192.168.1.1
 
 ## Running the Nodes
 
-> **Important**: Before running, ensure you update the absolute path in `src/perception/perception/yolo_object_detection.py`.
+> Important: The detector now supports parameters for model path, confidence threshold, device and class names. No code edits required.
 
 ### Run YOLO Object Detection
 
 ```bash
 ros2 run perception yolo_node --ros-args \
-  -p input_mode:=default \
-  -p model_type:=fine_tuned
+  -p input_mode:=realsense \
+  -p model_type:=fine_tuned \
+  -p model_path:="/Users/yourname/perception/ros2_ws/models/fine_tuned.pt" \
+  -p conf_threshold:=0.6 \
+  -p device:="cpu"
 ```
 
-- `input_mode`: `robot` or `realsense` (default) 
+- `input_mode`: `robot` or `realsense` (default)
 - `model_type`: `fine_tuned` or `default` (YOLOv8n)
+- `model_path`: explicit path to weights (.pt). If empty, falls back to defaults based on `model_type`.
+- `conf_threshold`: float, default `0.6`.
+- `device`: optional device string (e.g., `cpu`, `cuda:0`).
+- `class_names`: optional list to override class names; must align with training order.
 
 ### Run Pose Estimation
 
