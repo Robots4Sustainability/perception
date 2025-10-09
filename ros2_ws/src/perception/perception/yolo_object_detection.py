@@ -18,18 +18,51 @@ class YoloDetectorNode(Node):
         # Declare and get parameters
         self.declare_parameter('model_type', 'default')    # 'default' or 'fine_tuned'
         self.declare_parameter('input_mode', 'realsense')  # 'robot' or 'realsense'
+        self.declare_parameter('model_path', '')           # Optional explicit path to .pt
+        self.declare_parameter('conf_threshold', 0.6)      # Confidence threshold for filtering
+        self.declare_parameter('device', '')               # e.g., 'cpu', 'cuda:0' (optional)
+        self.declare_parameter('class_names', [])          # Optional override list for class names
 
         model_type = self.get_parameter('model_type').get_parameter_value().string_value
         input_mode = self.get_parameter('input_mode').get_parameter_value().string_value
+        explicit_model_path = self.get_parameter('model_path').get_parameter_value().string_value
+        self.conf_threshold = self.get_parameter('conf_threshold').get_parameter_value().double_value
+        device_param = self.get_parameter('device').get_parameter_value().string_value
+        class_names_param = self.get_parameter('class_names').get_parameter_value().string_array_value
 
         # Determine model path
-        if model_type == 'fine_tuned':
-            model_path = '/home/mohsin/official_build/ros2_ws/models/fine_tuned.pt'
+        if explicit_model_path:
+            model_path = explicit_model_path
         else:
-            model_path = '/home/mohsin/official_build/ros2_ws/models/yolov8n.pt'
+            if model_type == 'fine_tuned':
+                model_path = '/home/mohsin/official_build/ros2_ws/models/fine_tuned.pt'
+            else:
+                model_path = '/home/mohsin/official_build/ros2_ws/models/yolov8n.pt'
 
         self.get_logger().info(f"Using model type '{model_type}' from: {model_path}")
-        self.model = YOLO(model_path)
+        try:
+            if device_param:
+                self.model = YOLO(model_path)
+                # ultralytics model allows .to(device) for device selection
+                try:
+                    self.model.to(device_param)
+                    self.get_logger().info(f"Model moved to device: {device_param}")
+                except Exception as e:
+                    self.get_logger().warn(f"Failed to move model to device '{device_param}': {e}")
+            else:
+                self.model = YOLO(model_path)
+        except Exception as e:
+            self.get_logger().error(f"Failed to load YOLO model from '{model_path}': {e}")
+            raise
+
+        # Optional override for class names
+        self.class_names = None
+        try:
+            if class_names_param:
+                self.class_names = list(class_names_param)
+                self.get_logger().info(f"Using class names from parameter (n={len(self.class_names)})")
+        except Exception as e:
+            self.get_logger().warn(f"Failed to read class_names parameter: {e}")
 
         # Determine image topic
         if input_mode == 'robot':
@@ -46,8 +79,6 @@ class YoloDetectorNode(Node):
         self.image_sub = self.create_subscription(Image, image_topic, self.image_callback, 10)
         self.annotated_image_pub = self.create_publisher(Image, '/annotated_image', 10)
         self.detection_pub = self.create_publisher(Detection2DArray, '/detections', 10)
-
-        self.conf_threshold = 0.6  # Confidence threshold for filtering
 
         self.get_logger().info('YOLOv8 Detector Node started.')
 
@@ -84,7 +115,14 @@ class YoloDetectorNode(Node):
                 detection_msg.header = msg.header
 
                 hypothesis = ObjectHypothesisWithPose()
-                hypothesis.hypothesis.class_id = self.model.names[int(box.cls)]
+                try:
+                    if self.class_names and int(box.cls) < len(self.class_names):
+                        class_name = self.class_names[int(box.cls)]
+                    else:
+                        class_name = self.model.names[int(box.cls)]
+                except Exception:
+                    class_name = str(int(box.cls))
+                hypothesis.hypothesis.class_id = class_name
                 hypothesis.hypothesis.score = float(box.conf)
                 detection_msg.results.append(hypothesis)
 
