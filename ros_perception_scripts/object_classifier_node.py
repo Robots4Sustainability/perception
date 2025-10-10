@@ -11,8 +11,8 @@ class ObjectClassifierNode(Node):
         super().__init__('object_classifier_node')
 
         # Define the lists of pickable and non-pickable object classes
-        self.pickable_classes = ['motor', 'unit']
-        self.non_pickable_classes = ['wire_plugs', 'enclosure', 'speaker', 'assembly']
+        self.pickable_classes = ['motor', 'unit', 'speaker']
+        self.non_pickable_classes = ['wire_plugs', 'enclosure', 'assembly']
         
         self.get_logger().info(f"Pickable objects: {self.pickable_classes}")
         self.get_logger().info(f"Non-pickable objects: {self.non_pickable_classes}")

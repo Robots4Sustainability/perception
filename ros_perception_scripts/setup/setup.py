@@ -1,4 +1,6 @@
 from setuptools import find_packages, setup
+import os
+from glob import glob
 
 package_name = 'perception'
 
@@ -10,6 +12,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        (os.path.join('share', package_name, 'launch'), glob(os.path.join('launch', '*launch.[pxy][yma]*'))),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -21,6 +24,7 @@ setup(
     entry_points={
         'console_scripts': [
             "yolo_node = perception.yolo_object_detection:main",
+            "classifier_node = perception.object_classifier_node:main",
             "pose_node = perception.pose_pca:main",
             "opencv_camera_node = perception.opencv_camera_feed:main",
             "opencv_yolo = perception.opencv_yolo_object_detection:main",
