@@ -8,10 +8,23 @@ from ultralytics.engine.results import Boxes
 import torch
 import cv2
 import os
+from ament_index_python.packages import get_package_share_directory
+from pathlib import Path 
+
+def get_package_name_from_path(file_path):
+    """Dynamically find the package name from the file path."""
+    # e.g., /path/to/ws/install/my_pkg/lib/pythonX.Y/site-packages/my_pkg/node.py
+    # This will return 'my_pkg'
+    p = Path(file_path)
+    # The package name is the directory name after 'site-packages'
+    # parts will be like: ('/', 'path', ..., 'site-packages', 'my_pkg', 'node.py')
+    package_parts = p.parts[p.parts.index('site-packages') + 1:]
+    return package_parts[0]
 
 
 class YoloDetectorNode(Node):
     def __init__(self):
+        self.package_name = get_package_name_from_path(__file__)
         super().__init__('yolo_detector_node')
         self.bridge = CvBridge()
 
@@ -34,12 +47,17 @@ class YoloDetectorNode(Node):
         if explicit_model_path:
             model_path = explicit_model_path
         else:
+            # Get the absolute path to the package's share directory
+            package_share_directory = get_package_share_directory(self.package_name)
+            
             if model_type == 'fine_tuned':
-                model_path = '/home/mohsin/official_build/perception/ros2_ws/models/fine_tuned.pt'
+                # Construct the path to the model relative to the share directory
+                model_path = os.path.join(package_share_directory, 'models', 'fine_tuned.pt')
             else:
-                model_path = '/home/mohsin/official_build/perception/ros2_ws/models/yolov8n.pt'
+                model_path = os.path.join(package_share_directory, 'models', 'yolov8n.pt')
 
         self.get_logger().info(f"Using model type '{model_type}' from: {model_path}")
+
         try:
             if device_param:
                 self.model = YOLO(model_path)
