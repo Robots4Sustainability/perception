@@ -211,7 +211,7 @@ ros2_ws/src/perception/rviz/pose_estimation.rviz
    pip install -r requirements.txt
    ```
 
-4. Download the dataset from the [Releases](https://github.com/Robots4Sustainability/perception/releases/tag/v1.0.0) page.
+4. Download the dataset from the [Releases](https://github.com/Robots4Sustainability/perception/releases) page.
 
 5. Run `main.ipynb`:
    - Renames files (if needed)
