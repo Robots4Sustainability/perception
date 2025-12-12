@@ -22,7 +22,7 @@ setup(
         'console_scripts': [
             "yolo_node = perception.yolo_object_detection:main",
             "pose_node = perception.pose_pca:main",
-            'table_segmentation_node = perception.table_segmentation:main',
+            "table_segmentation_node = perception.table_segmentation:main",
             "opencv_camera_node = perception.opencv_camera_feed:main",
             "opencv_yolo = perception.opencv_yolo_object_detection:main",
         ],
