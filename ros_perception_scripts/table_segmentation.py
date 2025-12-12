@@ -58,6 +58,10 @@ class TableSegmentationNode(Node):
         target_point = self.find_empty_spot(table_cloud, object_cloud)
         
         if target_point is not None:
+            self.get_logger().info(
+                f"Target Empty Spot: X={target_point[0]:.3f}, Y={target_point[1]:.3f}, Z={target_point[2]:.3f} "
+                f"(Frame: {ros_cloud_msg.header.frame_id})"
+            )
             self.publish_target_pose(target_point[0], target_point[1], target_point[2], ros_cloud_msg.header)
         else:
             self.get_logger().warn("Table full or no safe spot found!")
@@ -78,41 +82,60 @@ class TableSegmentationNode(Node):
         # KDTree for fast distance check
         table_tree = o3d.geometry.KDTreeFlann(table_cloud)
         
+        # Check distance to objects
         has_objects = len(object_cloud.points) > 0
         if has_objects:
             object_tree = o3d.geometry.KDTreeFlann(object_cloud)
         
+        # Calculate table boundaries and center
         table_pts = np.asarray(table_cloud.points)
         min_x, min_y = np.min(table_pts[:,0]), np.min(table_pts[:,1])
         max_x, max_y = np.max(table_pts[:,0]), np.max(table_pts[:,1])
         avg_z = np.mean(table_pts[:,2])
+        
+        center_x = np.mean(table_pts[:,0])
+        center_y = np.mean(table_pts[:,1])
 
-        # Grid search parameters
         step_size = 0.05 # Check every 5cm
         safety_radius = 0.15 # 15cm from objects
         
+        # Ignore the outer 5cm of the bounding box
+        edge_margin = 0.05
+        
         best_point = None
-        max_dist_to_obj = -1.0
+        best_score = -float('inf')
 
-        for x in np.arange(min_x, max_x, step_size):
-            for y in np.arange(min_y, max_y, step_size):
+        # Iterate through the grid by also skipping the edges
+        for x in np.arange(min_x + edge_margin, max_x - edge_margin, step_size):
+            for y in np.arange(min_y + edge_margin, max_y - edge_margin, step_size):
                 candidate = np.array([x, y, avg_z])
                 
+                # Check if there is a table surface here
+                # If 0 neighbors, it's a hole or off-shape edge.
                 [k, _, _] = table_tree.search_radius_vector_3d(candidate, 0.05)
                 if k == 0: continue 
 
+                # Calculate distance to center
+                dist_to_center = np.sqrt((x - center_x)**2 + (y - center_y)**2)
+
+                # Avoid objects
                 if has_objects:
                     [_, _, dist_sq] = object_tree.search_knn_vector_3d(candidate, 1)
-                    dist = np.sqrt(dist_sq[0])
-                    if dist < safety_radius:
-                        continue 
+                    dist_to_obj = np.sqrt(dist_sq[0])
                     
-                    # the spot furthest from everything
-                    if dist > max_dist_to_obj:
-                        max_dist_to_obj = dist
-                        best_point = candidate
+                    if dist_to_obj < safety_radius:
+                        continue # Too close to an object
+                    
+                    # Calculate score: favor distance from objects and closeness to center
+                    score = dist_to_obj - (0.8 * dist_to_center)
                 else:
-                    return candidate # Empty table, take first valid spot
+                    # If table is empty, find the spot closest to center
+                    score = -dist_to_center
+
+                # Pick the best score
+                if score > best_score:
+                    best_score = score
+                    best_point = candidate
 
         return best_point
 
