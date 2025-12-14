@@ -2,6 +2,7 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import PointCloud2, PointField
 from geometry_msgs.msg import PoseStamped
+from visualization_msgs.msg import Marker
 from std_msgs.msg import Header
 import sensor_msgs_py.point_cloud2 as pc2
 import open3d as o3d
@@ -34,7 +35,7 @@ class TableSegmentationNode(Node):
         self.place_pose_pub = self.create_publisher(PoseStamped, '/perception/target_place_pose', 10)
         self.table_cloud_pub = self.create_publisher(PointCloud2, '/perception/debug/table_plane', 10)
         self.object_cloud_pub = self.create_publisher(PointCloud2, '/perception/debug/objects', 10)
-        self.viz_pose_pub = self.create_publisher(PoseStamped, '/perception/debug/viz_pose', 10) # For RViz - Visual Offset above the table
+        self.viz_pub = self.create_publisher(Marker, '/perception/debug/viz_arrow', 10) # For RViz - Visual Offset above the table
 
     def cloud_callback(self, ros_cloud_msg):
         self.get_logger().info(f"Processing cloud: {ros_cloud_msg.width}x{ros_cloud_msg.height}")
@@ -87,9 +88,9 @@ class TableSegmentationNode(Node):
             viz_pose.pose.position.x = float(hover_point[0])
             viz_pose.pose.position.y = float(hover_point[1])
             viz_pose.pose.position.z = float(hover_point[2])
-            viz_pose.pose.orientation = real_pose.pose.orientation 
-            
-            self.viz_pose_pub.publish(viz_pose)
+            viz_pose.pose.orientation = real_pose.pose.orientation
+
+            self.publish_arrow_marker(viz_pose)
         else:
             self.get_logger().warn("Table full or no safe spot found!")
 
@@ -112,10 +113,10 @@ class TableSegmentationNode(Node):
         normal = normal / np.linalg.norm(normal)
 
         # Define the arrow direction (X-axis)
-        if normal[2] < 0:
-            target_x = normal 
+        if normal[1] < 0:  # If Y is negative (pointing up)
+            target_x = -normal # Flip it to point down/table
         else:
-            target_x = -normal
+            target_x = normal
 
         # Construct Orthogonal Axes
         ref_vector = np.array([0, 1, 0])
@@ -163,6 +164,27 @@ class TableSegmentationNode(Node):
             qz = 0.25 * S
 
         return [qx, qy, qz, qw], target_x
+    
+    def publish_arrow_marker(self, pose_stamped):
+        marker = Marker()
+        marker.header = pose_stamped.header
+        marker.ns = "target_arrow"
+        marker.id = 0
+        marker.type = Marker.ARROW
+        marker.action = Marker.ADD
+        
+        marker.pose = pose_stamped.pose
+        
+        marker.scale.x = 0.15  # 15cm Long
+        marker.scale.y = 0.01  # 1cm Wide
+        marker.scale.z = 0.02  # 2cm Head
+        
+        marker.color.r = 0.0
+        marker.color.g = 1.0
+        marker.color.b = 1.0
+        marker.color.a = 1.0
+
+        self.viz_pub.publish(marker)
 
     def find_empty_spot(self, table_cloud, object_cloud):
         if len(table_cloud.points) == 0:
