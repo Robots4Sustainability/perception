@@ -34,6 +34,7 @@ class TableSegmentationNode(Node):
         self.place_pose_pub = self.create_publisher(PoseStamped, '/perception/target_place_pose', 10)
         self.table_cloud_pub = self.create_publisher(PointCloud2, '/perception/debug/table_plane', 10)
         self.object_cloud_pub = self.create_publisher(PointCloud2, '/perception/debug/objects', 10)
+        self.viz_pose_pub = self.create_publisher(PoseStamped, '/perception/debug/viz_pose', 10) # For RViz - Visual Offset above the table
 
     def cloud_callback(self, ros_cloud_msg):
         self.get_logger().info(f"Processing cloud: {ros_cloud_msg.width}x{ros_cloud_msg.height}")
@@ -58,26 +59,37 @@ class TableSegmentationNode(Node):
         target_point = self.find_empty_spot(table_cloud, object_cloud)
         
         if target_point is not None:
-            quat = self.get_orientation_from_plane(plane_model)
+            quat, arrow_vector = self.get_orientation_from_plane(plane_model)
 
             self.get_logger().info(
                 f"Target: X={target_point[0]:.2f}, Y={target_point[1]:.2f}, Z={target_point[2]:.2f}"
             )
 
-            # Publish Pose
-            pose_msg = PoseStamped()
-            pose_msg.header = ros_cloud_msg.header
-            pose_msg.pose.position.x = float(target_point[0])
-            pose_msg.pose.position.y = float(target_point[1])
-            pose_msg.pose.position.z = float(target_point[2])
+            # Publish the real target pose for the robot
+            real_pose = PoseStamped()
+            real_pose.header = ros_cloud_msg.header
+            real_pose.pose.position.x = float(target_point[0])
+            real_pose.pose.position.y = float(target_point[1])
+            real_pose.pose.position.z = float(target_point[2])
+            real_pose.pose.orientation.x = float(quat[0])
+            real_pose.pose.orientation.y = float(quat[1])
+            real_pose.pose.orientation.z = float(quat[2])
+            real_pose.pose.orientation.w = float(quat[3])
             
-            # Apply calculated quaternion
-            pose_msg.pose.orientation.x = float(quat[0])
-            pose_msg.pose.orientation.y = float(quat[1])
-            pose_msg.pose.orientation.z = float(quat[2])
-            pose_msg.pose.orientation.w = float(quat[3])
+            self.place_pose_pub.publish(real_pose)
+
+            # Publish a visualization pose slightly above the table for RViz
+            viz_len = 0.15
+            hover_point = target_point - (arrow_vector * viz_len)
             
-            self.place_pose_pub.publish(pose_msg)        
+            viz_pose = PoseStamped()
+            viz_pose.header = ros_cloud_msg.header
+            viz_pose.pose.position.x = float(hover_point[0])
+            viz_pose.pose.position.y = float(hover_point[1])
+            viz_pose.pose.position.z = float(hover_point[2])
+            viz_pose.pose.orientation = real_pose.pose.orientation 
+            
+            self.viz_pose_pub.publish(viz_pose)
         else:
             self.get_logger().warn("Table full or no safe spot found!")
 
@@ -150,7 +162,7 @@ class TableSegmentationNode(Node):
             qy = (R[1,2] + R[2,1]) / S
             qz = 0.25 * S
 
-        return [qx, qy, qz, qw]
+        return [qx, qy, qz, qw], target_x
 
     def find_empty_spot(self, table_cloud, object_cloud):
         if len(table_cloud.points) == 0:
@@ -174,10 +186,10 @@ class TableSegmentationNode(Node):
         center_y = np.mean(table_pts[:,1])
 
         step_size = 0.05 # Check every 5cm
-        safety_radius = 0.15 # 15cm from objects
+        safety_radius = 0.05 # 5cm from objects
         
-        # Ignore the outer 5cm of the bounding box
-        edge_margin = 0.05
+        # Ignore the outer 2.5cm of the bounding box
+        edge_margin = 0.025
         
         best_point = None
         best_score = -float('inf')
