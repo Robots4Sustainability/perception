@@ -58,11 +58,26 @@ class TableSegmentationNode(Node):
         target_point = self.find_empty_spot(table_cloud, object_cloud)
         
         if target_point is not None:
+            quat = self.get_orientation_from_plane(plane_model)
+
             self.get_logger().info(
-                f"Target Empty Spot: X={target_point[0]:.3f}, Y={target_point[1]:.3f}, Z={target_point[2]:.3f} "
-                f"(Frame: {ros_cloud_msg.header.frame_id})"
+                f"Target: X={target_point[0]:.2f}, Y={target_point[1]:.2f}, Z={target_point[2]:.2f}"
             )
-            self.publish_target_pose(target_point[0], target_point[1], target_point[2], ros_cloud_msg.header)
+
+            # Publish Pose
+            pose_msg = PoseStamped()
+            pose_msg.header = ros_cloud_msg.header
+            pose_msg.pose.position.x = float(target_point[0])
+            pose_msg.pose.position.y = float(target_point[1])
+            pose_msg.pose.position.z = float(target_point[2])
+            
+            # Apply calculated quaternion
+            pose_msg.pose.orientation.x = float(quat[0])
+            pose_msg.pose.orientation.y = float(quat[1])
+            pose_msg.pose.orientation.z = float(quat[2])
+            pose_msg.pose.orientation.w = float(quat[3])
+            
+            self.place_pose_pub.publish(pose_msg)        
         else:
             self.get_logger().warn("Table full or no safe spot found!")
 
@@ -74,6 +89,68 @@ class TableSegmentationNode(Node):
             # Publish with Color support
             self.publish_o3d(table_cloud, self.table_cloud_pub, ros_cloud_msg.header)
             self.publish_o3d(object_cloud, self.object_cloud_pub, ros_cloud_msg.header)
+    
+    def get_orientation_from_plane(self, plane_model):
+        """
+        For visualization,
+        Calculates a quaternion where the X-AXIS (The Red Arrow) points into the table.
+        """
+        # Get the Normal Vector [a,b,c]
+        normal = np.array(plane_model[:3])
+        normal = normal / np.linalg.norm(normal)
+
+        # Define the arrow direction (X-axis)
+        if normal[2] < 0:
+            target_x = normal 
+        else:
+            target_x = -normal
+
+        # Construct Orthogonal Axes
+        ref_vector = np.array([0, 1, 0])
+        
+        # If too close to parallel, use World X (1,0,0)
+        if np.abs(np.dot(target_x, ref_vector)) > 0.9:
+            ref_vector = np.array([1, 0, 0])
+
+        # Z = X cross Ref
+        z_axis = np.cross(target_x, ref_vector)
+        z_axis = z_axis / np.linalg.norm(z_axis)
+        
+        # Y = Z cross X (Ensure orthogonality)
+        y_axis = np.cross(z_axis, target_x)
+        y_axis = y_axis / np.linalg.norm(y_axis)
+
+        # Create Rotation Matrix [ X  Y  Z ]
+        R = np.array([target_x, y_axis, z_axis]).T
+
+        # Convert to Quaternion [x, y, z, w]
+        tr = np.trace(R)
+        if tr > 0:
+            S = np.sqrt(tr + 1.0) * 2
+            qw = 0.25 * S
+            qx = (R[2,1] - R[1,2]) / S
+            qy = (R[0,2] - R[2,0]) / S
+            qz = (R[1,0] - R[0,1]) / S 
+        elif (R[0,0] > R[1,1]) and (R[0,0] > R[2,2]):
+            S = np.sqrt(1.0 + R[0,0] - R[1,1] - R[2,2]) * 2
+            qw = (R[2,1] - R[1,2]) / S
+            qx = 0.25 * S
+            qy = (R[0,1] + R[1,0]) / S
+            qz = (R[0,2] + R[2,0]) / S
+        elif (R[1,1] > R[2,2]):
+            S = np.sqrt(1.0 + R[1,1] - R[0,0] - R[2,2]) * 2
+            qw = (R[0,2] - R[2,0]) / S
+            qx = (R[0,1] + R[1,0]) / S
+            qy = 0.25 * S
+            qz = (R[1,2] + R[2,1]) / S
+        else:
+            S = np.sqrt(1.0 + R[2,2] - R[0,0] - R[1,1]) * 2
+            qw = (R[1,0] - R[0,1]) / S
+            qx = (R[0,2] + R[2,0]) / S
+            qy = (R[1,2] + R[2,1]) / S
+            qz = 0.25 * S
+
+        return [qx, qy, qz, qw]
 
     def find_empty_spot(self, table_cloud, object_cloud):
         if len(table_cloud.points) == 0:
@@ -155,15 +232,6 @@ class TableSegmentationNode(Node):
         except Exception as e:
             self.get_logger().error(f'Conversion error: {e}')
             return None
-
-    def publish_target_pose(self, x, y, z, header):
-        pose_msg = PoseStamped()
-        pose_msg.header = header
-        pose_msg.pose.position.x = x
-        pose_msg.pose.position.y = y
-        pose_msg.pose.position.z = z
-        pose_msg.pose.orientation.w = 1.0 
-        self.place_pose_pub.publish(pose_msg)
 
     def publish_o3d(self, o3d_cloud, publisher, header):
         points = np.asarray(o3d_cloud.points)
