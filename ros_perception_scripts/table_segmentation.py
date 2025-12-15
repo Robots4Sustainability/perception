@@ -139,8 +139,7 @@ class TableSegmentationNode(Node):
     
     def get_orientation_from_plane(self, plane_model):
         """
-        For visualization,
-        Calculates a quaternion where the X-AXIS (The Red Arrow) points into the table.
+        Calculates a quaternion where the X-AXIS points into the table.
         """
         # Get the Normal Vector [a,b,c]
         normal = np.array(plane_model[:3])
