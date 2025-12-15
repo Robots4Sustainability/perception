@@ -55,7 +55,10 @@ class TableSegmentationNode(Node):
             return
 
         table_cloud = pcd_down.select_by_index(inliers)
-        object_cloud = pcd_down.select_by_index(inliers, invert=True)
+        raw_object_cloud = pcd_down.select_by_index(inliers, invert=True)
+
+        # Filter objects above the table
+        object_cloud = self.filter_objects_above_table(raw_object_cloud, plane_model)
 
         target_point = self.find_empty_spot(table_cloud, object_cloud)
         
@@ -102,6 +105,37 @@ class TableSegmentationNode(Node):
             # Publish with Color support
             self.publish_o3d(table_cloud, self.table_cloud_pub, ros_cloud_msg.header)
             self.publish_o3d(object_cloud, self.object_cloud_pub, ros_cloud_msg.header)
+
+    def filter_objects_above_table(self, object_cloud, plane_model):
+        """
+        Removes points that are on the wrong side of the table.
+        Also removes points that are too high to be relevant objects.
+        """
+        if len(object_cloud.points) == 0:
+            return object_cloud
+
+        a, b, c, d = plane_model
+
+        # Determine camera side sign
+        camera_sign = np.sign(d)
+
+        points = np.asarray(object_cloud.points)
+        colors = np.asarray(object_cloud.colors) if object_cloud.has_colors() else None
+        
+        # Calculate signed distance for all points
+        distances = (points[:,0] * a) + (points[:,1] * b) + (points[:,2] * c) + d
+        
+        # Filter
+        # - Must be on the same side as camera (Above table)
+        # - Must be within 50cm of the table surface (Ignore ceiling/high noise)
+        valid_mask = (np.sign(distances) == camera_sign) & (np.abs(distances) < 0.5)
+
+        filtered_cloud = o3d.geometry.PointCloud()
+        filtered_cloud.points = o3d.utility.Vector3dVector(points[valid_mask])
+        if colors is not None:
+            filtered_cloud.colors = o3d.utility.Vector3dVector(colors[valid_mask])
+            
+        return filtered_cloud
     
     def get_orientation_from_plane(self, plane_model):
         """
