@@ -47,7 +47,7 @@ class TableSegmentationNode(Node):
         pcd_down = pcd.voxel_down_sample(voxel_size=0.005)
 
         try:
-            plane_model, inliers = pcd_down.segment_plane(distance_threshold=0.02,
+            plane_model, inliers = pcd_down.segment_plane(distance_threshold=0.005,
                                                         ransac_n=3,
                                                         num_iterations=1000)
         except Exception as e:
@@ -56,6 +56,8 @@ class TableSegmentationNode(Node):
 
         table_cloud = pcd_down.select_by_index(inliers)
         raw_object_cloud = pcd_down.select_by_index(inliers, invert=True)
+        #object_cloud = pcd_down.select_by_index(inliers, invert=True)
+
 
         # Filter objects above the table
         object_cloud = self.filter_objects_above_table(raw_object_cloud, plane_model)
@@ -220,68 +222,69 @@ class TableSegmentationNode(Node):
         self.viz_pub.publish(marker)
 
     def find_empty_spot(self, table_cloud, object_cloud):
-        if len(table_cloud.points) == 0:
-            return None
-
-        # KDTree for fast distance check
-        table_tree = o3d.geometry.KDTreeFlann(table_cloud)
+        if len(table_cloud.points) == 0: return None
         
-        # Check distance to objects
-        has_objects = len(object_cloud.points) > 0
-        if has_objects:
-            object_tree = o3d.geometry.KDTreeFlann(object_cloud)
-        
-        # Calculate table boundaries and center
+        # Get table geometry statistics
         table_pts = np.asarray(table_cloud.points)
         min_x, min_y = np.min(table_pts[:,0]), np.min(table_pts[:,1])
         max_x, max_y = np.max(table_pts[:,0]), np.max(table_pts[:,1])
-        avg_z = np.mean(table_pts[:,2])
-        
-        center_x = np.mean(table_pts[:,0])
-        center_y = np.mean(table_pts[:,1])
+        avg_z = np.mean(table_pts[:,2]) # The height of the table plane
+        center_x, center_y = np.mean(table_pts[:,0]), np.mean(table_pts[:,1])
 
-        step_size = 0.05 # Check every 5cm
-        safety_radius = 0.05 # 5cm from objects
+        table_tree = o3d.geometry.KDTreeFlann(table_cloud)
         
-        # Ignore the outer 2.5cm of the bounding box
-        edge_margin = 0.025
-        
-        best_point = None
+        has_objects = len(object_cloud.points) > 0
+        object_tree = None
+
+        if has_objects:
+            # Create a shadow cloud where all object points are projected onto the table plane (Z = avg_z).
+            # This ensures that tall objects block the grid points underneath them.
+            obj_points = np.asarray(object_cloud.points).copy()
+            obj_points[:, 2] = avg_z  # Force Z to match table height
+            
+            flat_object_cloud = o3d.geometry.PointCloud()
+            flat_object_cloud.points = o3d.utility.Vector3dVector(obj_points)
+            
+            # Build tree on the flattened cloud
+            object_tree = o3d.geometry.KDTreeFlann(flat_object_cloud)
+
+        # Grid search
+        step = 0.05
+        margin = 0.05
+        best_pt = None
         best_score = -float('inf')
 
-        # Iterate through the grid by also skipping the edges
-        for x in np.arange(min_x + edge_margin, max_x - edge_margin, step_size):
-            for y in np.arange(min_y + edge_margin, max_y - edge_margin, step_size):
-                candidate = np.array([x, y, avg_z])
+        for x in np.arange(min_x + margin, max_x - margin, step):
+            for y in np.arange(min_y + margin, max_y - margin, step):
+                # Candidate point on the table surface
+                cand = np.array([x, y, avg_z])
                 
-                # Check if there is a table surface here
-                # If 0 neighbors, it's a hole or off-shape edge.
-                [k, _, _] = table_tree.search_radius_vector_3d(candidate, 0.05)
+                # Check if it is this actually on the table
+                [k, _, _] = table_tree.search_radius_vector_3d(cand, 0.05)
                 if k == 0: continue 
 
-                # Calculate distance to center
-                dist_to_center = np.sqrt((x - center_x)**2 + (y - center_y)**2)
-
-                # Avoid objects
+                dist_center = np.sqrt((x - center_x)**2 + (y - center_y)**2)
+                
+                # Check collision with flattened objects
                 if has_objects:
-                    [_, _, dist_sq] = object_tree.search_knn_vector_3d(candidate, 1)
-                    dist_to_obj = np.sqrt(dist_sq[0])
+                    # Finds distance to the nearest object shadow
+                    [_, _, d_sq] = object_tree.search_knn_vector_3d(cand, 1)
+                    dist_obj = np.sqrt(d_sq[0])
                     
-                    if dist_to_obj < safety_radius:
-                        continue # Too close to an object
+                    # 10cm Radius Check
+                    if dist_obj < 0.1: 
+                        continue
                     
-                    # Calculate score: favor distance from objects and closeness to center
-                    score = dist_to_obj - (0.8 * dist_to_center)
+                    # Score: Maximize distance to object, minimize distance to center
+                    score = dist_obj - (0.8 * dist_center)
                 else:
-                    # If table is empty, find the spot closest to center
-                    score = -dist_to_center
+                    score = -dist_center
 
-                # Pick the best score
                 if score > best_score:
                     best_score = score
-                    best_point = candidate
-
-        return best_point
+                    best_pt = cand
+                    
+        return best_pt
 
     def convert_ros_to_o3d(self, ros_cloud):
         try:
