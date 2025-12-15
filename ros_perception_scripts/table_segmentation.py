@@ -43,6 +43,18 @@ class TableSegmentationNode(Node):
         pcd = self.convert_ros_to_o3d(ros_cloud_msg)
         if pcd is None:
             return
+        
+        max_depth = 1.2  # 1.2 meters
+        
+        points = np.asarray(pcd.points)
+        if len(points) > 0:
+            # Keep points where Z is less than max_depth
+            mask = points[:, 2] < max_depth
+            pcd = pcd.select_by_index(np.where(mask)[0])
+        
+        if len(pcd.points) < 100:
+            self.get_logger().warn("No points left after depth filtering!")
+            return
 
         pcd_down = pcd.voxel_down_sample(voxel_size=0.005)
 
@@ -56,8 +68,6 @@ class TableSegmentationNode(Node):
 
         table_cloud = pcd_down.select_by_index(inliers)
         raw_object_cloud = pcd_down.select_by_index(inliers, invert=True)
-        #object_cloud = pcd_down.select_by_index(inliers, invert=True)
-
 
         # Filter objects above the table
         object_cloud = self.filter_objects_above_table(raw_object_cloud, plane_model)
