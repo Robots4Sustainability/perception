@@ -35,8 +35,6 @@ class TableSegmentationNode(Node):
             pc_topic = '/camera/depth/color/points'
         elif input_mode == 'realsense':
             pc_topic = '/camera/camera/depth/color/points'
-        elif input_mode == 'cropped':
-            pc_topic = '/cropped_pointcloud'
         else:
             pc_topic = '/camera/depth/color/points'
 
