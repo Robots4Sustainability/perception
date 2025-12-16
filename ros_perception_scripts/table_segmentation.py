@@ -20,6 +20,10 @@ class TableSegmentationNode(Node):
         input_mode = self.get_parameter('input_mode').get_parameter_value().string_value
         self.debug_viz = self.get_parameter('debug_viz').get_parameter_value().bool_value
 
+        self.object_max_radius = 0.07 # Safety Radius of the object (max radius*2 wide object)
+        radius_offset = 0.02   # 2cm Offset to ensure safety
+        self.safety_radius = self.object_max_radius + radius_offset
+
         if input_mode == 'robot':
             pc_topic = '/camera/depth/color/points'
         elif input_mode == 'realsense':
@@ -35,6 +39,7 @@ class TableSegmentationNode(Node):
         self.place_pose_pub = self.create_publisher(PoseStamped, '/perception/target_place_pose', 10)
         self.table_cloud_pub = self.create_publisher(PointCloud2, '/perception/debug/table_plane', 10)
         self.object_cloud_pub = self.create_publisher(PointCloud2, '/perception/debug/objects', 10)
+        self.viz_sphere_pub = self.create_publisher(Marker, '/perception/debug/viz_sphere', 10) # Publisher for the Safety Sphere
         self.viz_pub = self.create_publisher(Marker, '/perception/debug/viz_arrow', 10) # For RViz - Visual Offset above the table
 
     def cloud_callback(self, ros_cloud_msg):
@@ -59,7 +64,7 @@ class TableSegmentationNode(Node):
         pcd_down = pcd.voxel_down_sample(voxel_size=0.005)
 
         try:
-            plane_model, inliers = pcd_down.segment_plane(distance_threshold=0.005,
+            plane_model, inliers = pcd_down.segment_plane(distance_threshold=0.008,
                                                         ransac_n=3,
                                                         num_iterations=1000)
         except Exception as e:
@@ -106,6 +111,8 @@ class TableSegmentationNode(Node):
             viz_pose.pose.orientation = real_pose.pose.orientation
 
             self.publish_arrow_marker(viz_pose)
+
+            self.publish_safety_sphere(real_pose)
         else:
             self.get_logger().warn("Table full or no safe spot found!")
 
@@ -117,6 +124,48 @@ class TableSegmentationNode(Node):
             # Publish with Color support
             self.publish_o3d(table_cloud, self.table_cloud_pub, ros_cloud_msg.header)
             self.publish_o3d(object_cloud, self.object_cloud_pub, ros_cloud_msg.header)
+
+    def publish_safety_sphere(self, pose_stamped):
+        marker = Marker()
+        marker.header = pose_stamped.header
+        marker.ns = "safety_sphere"
+        marker.id = 1
+        marker.type = Marker.SPHERE
+        marker.action = Marker.ADD
+        marker.pose = pose_stamped.pose
+        
+        diameter = self.object_max_radius * 2.0
+        marker.scale.x = diameter
+        marker.scale.y = diameter
+        marker.scale.z = diameter
+        
+        marker.color.r = 0.0
+        marker.color.g = 0.5
+        marker.color.b = 1.0
+        marker.color.a = 0.5
+
+        self.viz_sphere_pub.publish(marker)
+    
+    def publish_arrow_marker(self, pose_stamped):
+        marker = Marker()
+        marker.header = pose_stamped.header
+        marker.ns = "target_arrow"
+        marker.id = 0
+        marker.type = Marker.ARROW
+        marker.action = Marker.ADD
+        
+        marker.pose = pose_stamped.pose
+        
+        marker.scale.x = 0.15  # 15cm Long
+        marker.scale.y = 0.01  # 1cm Wide
+        marker.scale.z = 0.02  # 2cm Head
+        
+        marker.color.r = 0.0
+        marker.color.g = 1.0
+        marker.color.b = 1.0
+        marker.color.a = 1.0
+
+        self.viz_pub.publish(marker)
 
     def filter_objects_above_table(self, object_cloud, plane_model):
         """
@@ -210,27 +259,6 @@ class TableSegmentationNode(Node):
 
         return [qx, qy, qz, qw], target_x
     
-    def publish_arrow_marker(self, pose_stamped):
-        marker = Marker()
-        marker.header = pose_stamped.header
-        marker.ns = "target_arrow"
-        marker.id = 0
-        marker.type = Marker.ARROW
-        marker.action = Marker.ADD
-        
-        marker.pose = pose_stamped.pose
-        
-        marker.scale.x = 0.15  # 15cm Long
-        marker.scale.y = 0.01  # 1cm Wide
-        marker.scale.z = 0.02  # 2cm Head
-        
-        marker.color.r = 0.0
-        marker.color.g = 1.0
-        marker.color.b = 1.0
-        marker.color.a = 1.0
-
-        self.viz_pub.publish(marker)
-
     def find_empty_spot(self, table_cloud, object_cloud):
         if len(table_cloud.points) == 0: return None
         
@@ -281,8 +309,8 @@ class TableSegmentationNode(Node):
                     [_, _, d_sq] = object_tree.search_knn_vector_3d(cand, 1)
                     dist_obj = np.sqrt(d_sq[0])
                     
-                    # 10cm Radius Check
-                    if dist_obj < 0.1: 
+                    # Radius Check
+                    if dist_obj < self.safety_radius: 
                         continue
                     
                     # Score: Maximize distance to object, minimize distance to center
