@@ -3,7 +3,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import PointCloud2, PointField
 from geometry_msgs.msg import PoseStamped
 from visualization_msgs.msg import Marker
-from std_msgs.msg import Header
+from std_msgs.msg import Float32, Header
 import sensor_msgs_py.point_cloud2 as pc2
 import open3d as o3d
 import numpy as np
@@ -17,12 +17,19 @@ class TableSegmentationNode(Node):
         self.declare_parameter('input_mode', 'robot')
         self.declare_parameter('debug_viz', True)
 
+        self.declare_parameter('mode', 'test')            # 'test' or 'actual'
+        self.declare_parameter('test_radius', 0.07)       # Default radius for test mode (7cm)
+        self.declare_parameter('safety_margin', 0.02)     # Default safety margin (2cm)
+
+        # Get Parameters
         input_mode = self.get_parameter('input_mode').get_parameter_value().string_value
         self.debug_viz = self.get_parameter('debug_viz').get_parameter_value().bool_value
+        self.op_mode = self.get_parameter('mode').get_parameter_value().string_value
+        self.current_radius = self.get_parameter('test_radius').get_parameter_value().double_value
+        self.safety_margin = self.get_parameter('safety_margin').get_parameter_value().double_value
 
-        self.object_max_radius = 0.07 # Safety Radius of the object (max radius*2 wide object)
-        radius_offset = 0.02   # 2cm Offset to ensure safety
-        self.safety_radius = self.object_max_radius + radius_offset
+        self.get_logger().info(f"Starting in MODE: {self.op_mode}")
+        self.get_logger().info(f"Initial Radius: {self.current_radius}m | Safety Margin: {self.safety_margin}m")
 
         if input_mode == 'robot':
             pc_topic = '/camera/depth/color/points'
@@ -36,11 +43,31 @@ class TableSegmentationNode(Node):
         self.get_logger().info(f"Subscribing to: {pc_topic}")
 
         self.pc_sub = self.create_subscription(PointCloud2, pc_topic, self.cloud_callback, 10)
+
+        # Radius Subscriber (Only active in actual mode)
+        if self.op_mode == 'actual':
+            self.radius_sub = self.create_subscription(
+                Float32, 
+                '/perception/detected_object_radius', 
+                self.radius_callback, 
+                10
+            )
+            self.get_logger().info("Listening to /perception/detected_object_radius for updates...")
+
+        # Publishers
         self.place_pose_pub = self.create_publisher(PoseStamped, '/perception/target_place_pose', 10)
+        self.viz_sphere_pub = self.create_publisher(Marker, '/perception/debug/viz_sphere', 10) # Publisher for the Safety Sphere
+
+        # Debug Publishers
         self.table_cloud_pub = self.create_publisher(PointCloud2, '/perception/debug/table_plane', 10)
         self.object_cloud_pub = self.create_publisher(PointCloud2, '/perception/debug/objects', 10)
-        self.viz_sphere_pub = self.create_publisher(Marker, '/perception/debug/viz_sphere', 10) # Publisher for the Safety Sphere
         self.viz_pub = self.create_publisher(Marker, '/perception/debug/viz_arrow', 10) # For RViz - Visual Offset above the table
+    
+    def radius_callback(self, msg):
+        """Called only in actual mode when a new object size is detected."""
+        if msg.data > 0.01:  # Minimum 1cm radius
+            self.current_radius = float(msg.data)
+            self.get_logger().info(f"Updated Object Radius to: {self.current_radius:.3f}m")
 
     def cloud_callback(self, ros_cloud_msg):
         self.get_logger().info(f"Processing cloud: {ros_cloud_msg.width}x{ros_cloud_msg.height}")
@@ -77,7 +104,8 @@ class TableSegmentationNode(Node):
         # Filter objects above the table
         object_cloud = self.filter_objects_above_table(raw_object_cloud, plane_model)
 
-        target_point = self.find_empty_spot(table_cloud, object_cloud)
+        total_check_radius = self.current_radius + self.safety_margin
+        target_point = self.find_empty_spot(table_cloud, object_cloud, total_check_radius)
         
         if target_point is not None:
             quat, arrow_vector = self.get_orientation_from_plane(plane_model)
@@ -112,7 +140,7 @@ class TableSegmentationNode(Node):
 
             self.publish_arrow_marker(viz_pose)
 
-            self.publish_safety_sphere(real_pose)
+            self.publish_safety_sphere(real_pose, self.current_radius)
         else:
             self.get_logger().warn("Table full or no safe spot found!")
 
@@ -125,7 +153,7 @@ class TableSegmentationNode(Node):
             self.publish_o3d(table_cloud, self.table_cloud_pub, ros_cloud_msg.header)
             self.publish_o3d(object_cloud, self.object_cloud_pub, ros_cloud_msg.header)
 
-    def publish_safety_sphere(self, pose_stamped):
+    def publish_safety_sphere(self, pose_stamped, radius):
         marker = Marker()
         marker.header = pose_stamped.header
         marker.ns = "safety_sphere"
@@ -134,7 +162,7 @@ class TableSegmentationNode(Node):
         marker.action = Marker.ADD
         marker.pose = pose_stamped.pose
         
-        diameter = self.object_max_radius * 2.0
+        diameter = radius * 2.0
         marker.scale.x = diameter
         marker.scale.y = diameter
         marker.scale.z = diameter
@@ -259,7 +287,7 @@ class TableSegmentationNode(Node):
 
         return [qx, qy, qz, qw], target_x
     
-    def find_empty_spot(self, table_cloud, object_cloud):
+    def find_empty_spot(self, table_cloud, object_cloud, radius_to_check):
         if len(table_cloud.points) == 0: return None
         
         # Get table geometry statistics
@@ -288,12 +316,11 @@ class TableSegmentationNode(Node):
 
         # Grid search
         step = 0.05
-        margin = 0.05
         best_pt = None
         best_score = -float('inf')
 
-        for x in np.arange(min_x + margin, max_x - margin, step):
-            for y in np.arange(min_y + margin, max_y - margin, step):
+        for x in np.arange(min_x, max_x, step):
+            for y in np.arange(min_y , max_y, step):
                 # Candidate point on the table surface
                 cand = np.array([x, y, avg_z])
                 
@@ -310,13 +337,19 @@ class TableSegmentationNode(Node):
                     dist_obj = np.sqrt(d_sq[0])
                     
                     # Radius Check
-                    if dist_obj < self.safety_radius: 
+                    if dist_obj < radius_to_check: 
                         continue
                     
                     # Score: Maximize distance to object, minimize distance to center
                     score = dist_obj - (0.8 * dist_center)
                 else:
                     score = -dist_center
+
+                # Check if object radius fits on table
+                if (x - radius_to_check < min_x) or (x + radius_to_check > max_x):
+                    continue
+                if (y - radius_to_check < min_y) or (y + radius_to_check > max_y):
+                    continue
 
                 if score > best_score:
                     best_score = score
