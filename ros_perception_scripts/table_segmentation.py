@@ -103,7 +103,7 @@ class TableSegmentationNode(Node):
         object_cloud = self.filter_objects_above_table(raw_object_cloud, plane_model)
 
         total_check_radius = self.current_radius + self.safety_margin
-        target_point = self.find_empty_spot(table_cloud, object_cloud, total_check_radius)
+        target_point = self.find_empty_spot(table_cloud, object_cloud, total_check_radius, plane_model)
         
         if target_point is not None:
             quat, arrow_vector = self.get_orientation_from_plane(plane_model)
@@ -285,13 +285,16 @@ class TableSegmentationNode(Node):
 
         return [qx, qy, qz, qw], target_x
     
-    def find_empty_spot(self, table_cloud, object_cloud, radius_to_check):
+    def find_empty_spot(self, table_cloud, object_cloud, radius_to_check, plane_model):
         if len(table_cloud.points) == 0: return None
         
+        a, b, c, d = plane_model
+
         # Get table geometry statistics
         table_pts = np.asarray(table_cloud.points)
         min_x, min_y = np.min(table_pts[:,0]), np.min(table_pts[:,1])
         max_x, max_y = np.max(table_pts[:,0]), np.max(table_pts[:,1])
+
         avg_z = np.mean(table_pts[:,2]) # The height of the table plane
         center_x, center_y = np.mean(table_pts[:,0]), np.mean(table_pts[:,1])
 
@@ -319,11 +322,21 @@ class TableSegmentationNode(Node):
 
         for x in np.arange(min_x, max_x, step):
             for y in np.arange(min_y , max_y, step):
-                # Candidate point on the table surface
-                cand = np.array([x, y, avg_z])
+
+                if abs(c) < 0.001: # Avoid division by zero (vertical plane)
+                    z_plane = avg_z
+                else:
+                    z_plane = -(a*x + b*y + d) / c
+                
+                # The candidate point follows the table tilt
+                cand = np.array([x, y, z_plane])
+                
+                # use a temp candidate at avg_z for the KDTree checks
+                # (the tree and objects are built around avg_z for simplicity)
+                check_cand = np.array([x, y, avg_z])
                 
                 # Check if it is this actually on the table
-                [k, _, _] = table_tree.search_radius_vector_3d(cand, 0.05)
+                [k, _, _] = table_tree.search_radius_vector_3d(check_cand, 0.05)
                 if k == 0: continue 
 
                 dist_center = np.sqrt((x - center_x)**2 + (y - center_y)**2)
@@ -331,7 +344,7 @@ class TableSegmentationNode(Node):
                 # Check collision with flattened objects
                 if has_objects:
                     # Finds distance to the nearest object shadow
-                    [_, _, d_sq] = object_tree.search_knn_vector_3d(cand, 1)
+                    [_, _, d_sq] = object_tree.search_knn_vector_3d(check_cand, 1)
                     dist_obj = np.sqrt(d_sq[0])
                     
                     # Radius Check
