@@ -1,6 +1,6 @@
 Terminal 1
 ```bash
-ros2 launch perception perception_launch.py input_source:=robot
+ros2 launch perception action_launch.py input_source:=robot
 ```
 
 Terminal 2
