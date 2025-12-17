@@ -16,6 +16,8 @@ ros2 run perception table_segmentation_node --ros-args -p mode:=test -p test_rad
 
 **Publish object radius:**
 
+If running in `mode:=actual`, to change radius of object:
+
 In another terminal, run:
 ```bash
 ros2 topic pub --once /perception/detected_object_radius std_msgs/msg/Float32 "{data: <object_radius>}"
@@ -29,3 +31,15 @@ The above image is highlighting segmentation of the car parts which is then esti
 which will look at empty space and decide whether this sphere is possible to be placed on the table without colliding with other objects. 
 
 Object Segemntation->Sphere Approximation->(passed the radius)->Table_segementation
+
+**Place Object**
+
+The results of running the table segmentation node will look like:
+
+![alt text](place_object_1.png)
+
+![alt text](place_object_2.png)
+
+![alt text](no_place.png)
+
+
