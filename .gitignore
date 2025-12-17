@@ -1,0 +1,44 @@
+# Python virtual environments
+venv/
+.venv/
+env/
+ENV/
+*.venv/
+*/venv/
+*/.venv/
+*/env/
+
+# Pipenv / Poetry
+Pipfile.lock
+poetry.lock
+.poetry/
+.pdm.toml
+
+# ROS 2 build artifacts
+build/
+install/
+log/
+
+# Colcon test results
+test_results/
+
+# ROS 2 workspace overlays
+*.cache/
+*.db
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# VSCode / IDE settings
+.vscode/
+.idea/
+*.swp
+
+# Miscellaneous
+.DS_Store
+*.bak
+*.tmp
+*.out
