@@ -30,8 +30,14 @@ setup(
             "yolo_node = perception.yolo_object_detection:main",
             "classifier_node = perception.object_classifier_node:main",
             "pose_node = perception.pose_pca:main",
-            "opencv_camera_node = perception.opencv_camera_feed:main",
-            "opencv_yolo = perception.opencv_yolo_object_detection:main",
+            "action_pose_node = perception.action_pose_pca:main",
+            "action_yolo_node = perception.action_yolo_object_detection:main",
+            "vision_manager_node = perception.action_vision_manager:main",
+            "table_segmentation_node = perception.table_segmentation:main",
+            "segment_object = perception.segment_object:main",
+
+            
+            
         ],
     },
 )
