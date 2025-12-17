@@ -9,6 +9,7 @@ This repository provides a complete vision pipeline that supports object detecti
 
 ## Table of Contents
 
+- [Release_3](#Release_3)
 - [Cloning the Repository](#cloning-the-repository)
 - [Project Structure](#project-structure)
 - [Pose Estimation Setup](#pose-estimation-setup)
@@ -26,8 +27,7 @@ This repository provides a complete vision pipeline that supports object detecti
 ## Cloning the Repository
 
 ```bash
-git clone git@github.com:Robots4Sustainability/perception.git
-cd your-repo
+ros2 run perception segment_object
 ```
 
 ---
@@ -40,7 +40,7 @@ cd your-repo
 
 ---
 
-## Pose Estimation Setup
+Applies segmentation on the table and detects empty spaces.
 
 1. Create a virtual environment in the root folder:
    ```bash
@@ -65,23 +65,12 @@ cd your-repo
 
 ## Launching the Camera and Robot
 
-### RealSense Camera Launch
+In another terminal, run:
 ```bash
-ros2 launch realsense2_camera rs_launch.py \
-  enable_rgbd:=true \
-  enable_sync:=true \
-  align_depth.enable:=true \
-  enable_color:=true \
-  enable_depth:=true \
-  pointcloud.enable:=true \
-  rgb_camera.color_profile:=640x480x30 \
-  depth_module.depth_profile:=640x480x30 \
-  pointcloud.ordered_pc:=true
+ros2 topic pub --once /perception/detected_object_radius std_msgs/msg/Float32 "{data: <object_radius>}"
 ```
 
-### Kinova Robot Vision Node Launch
-Left Arm IP: 192.168.1.10
-Right Arm IP: 192.168.1.12
+For example, <object_radius> could be 0.07.
 
 For Kinova Vision Node, you must `export RMW_IMPLEMENTATION=rmw_zenoh_cpp` in every terminal, but before that
 Follow the instructions below:
@@ -166,25 +155,12 @@ ros2 run perception pose_node --ros-args -p input_mode:=default
 
 - `input_mode`: `robot` or `realsense` (default) 
 
----
+![alt text](place_object_1.png)
 
-## RViz Visualization
+![alt text](place_object_2.png)
 
-To visualize the results:
+![alt text](no_place.png)
 
-```bash
-rviz2
-```
-
-You can load the pre-configured RViz setup:
-
-```bash
-ros2_ws/src/perception/rviz/pose_estimation.rviz
-```
-
----
-
-## Topics
 
 | Topic Name             | Description                         |
 |------------------------|-------------------------------------|
@@ -225,3 +201,10 @@ ros2_ws/src/perception/rviz/pose_estimation.rviz
    ```
 
 6. Use `Inference.ipynb` to test the trained model.
+
+# Release_3
+[Table_Segmentation_Readme]()
+[Table_Height_Readme]()
+[Action_Server_Readme]()
+[Asjad's Readme]()
+
