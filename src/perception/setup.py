@@ -33,6 +33,10 @@ setup(
             "action_pose_node = perception.action_pose_pca:main",
             "action_yolo_node = perception.action_yolo_object_detection:main",
             "vision_manager_node = perception.action_vision_manager:main",
+            "table_segmentation_node = perception.table_segmentation:main",
+            "segment_object = perception.segment_object:main",
+
+            
             
         ],
     },
