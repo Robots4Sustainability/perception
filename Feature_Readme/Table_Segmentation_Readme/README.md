@@ -36,8 +36,7 @@ Object Segemntation->Sphere Approximation->(passed the radius)->Table_segementat
 
 The results of running the table segmentation node will look like:
 
-![alt text](place_object_1.png)
 
-![alt text](place_object_2.png)
-
-![alt text](no_place.png)
+![place_obj_1](https://raw.githubusercontent.com/Robots4Sustainability/perception/refs/heads/dev/place_object_1.png)
+![place_obj_2](https://raw.githubusercontent.com/Robots4Sustainability/perception/refs/heads/dev/place_object_2.png)
+![place_obj_no_place](https://raw.githubusercontent.com/Robots4Sustainability/perception/refs/heads/dev/no_place.png)
