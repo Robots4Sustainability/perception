@@ -1,0 +1,27 @@
+# ROS 2
+build/
+install/
+log/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.input/
+
+# IDEs
+.vscode/
+.idea/
+
+# YOLO/Training Artifacts
+runs/
+*.pt
+
+# Data (Assuming user manages this outside git or uses DVC)
+datasets/
+models/*.pt
+
+# OS
+.DS_Store
+Thumbs.db

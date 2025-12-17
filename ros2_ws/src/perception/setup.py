@@ -1,4 +1,6 @@
 from setuptools import find_packages, setup
+from glob import glob
+import os
 
 package_name = 'perception'
 
@@ -10,6 +12,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -24,6 +27,7 @@ setup(
             "pose_node = perception.pose_pca:main",
             "opencv_camera_node = perception.opencv_camera_feed:main",
             "opencv_yolo = perception.opencv_yolo_object_detection:main",
+            "mock_depth_node = perception.mock_depth_publisher:main",
         ],
     },
 )

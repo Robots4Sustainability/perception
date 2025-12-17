@@ -9,6 +9,16 @@ import torch
 import cv2
 import os
 
+# Monkeypatch torch.load to disable weights_only enforcement by default
+# Required for Ultralytics 8.1.0 with PyTorch 2.6+
+if hasattr(torch, 'load'):
+    original_load = torch.load
+    def safe_load(*args, **kwargs):
+        if 'weights_only' not in kwargs:
+             kwargs['weights_only'] = False
+        return original_load(*args, **kwargs)
+    torch.load = safe_load
+
 
 class YoloDetectorNode(Node):
     def __init__(self):
@@ -16,19 +26,24 @@ class YoloDetectorNode(Node):
         self.bridge = CvBridge()
 
         # Declare and get parameters
-        self.declare_parameter('model_type', 'default')    # 'default' or 'fine_tuned'
+        self.declare_parameter('model_path', '')
+        self.declare_parameter('model_type', 'default')    # 'default' or 'fine_tuned' (deprecated if model_path used)
         self.declare_parameter('input_mode', 'realsense')  # 'robot' or 'realsense'
 
+        model_path_param = self.get_parameter('model_path').get_parameter_value().string_value
         model_type = self.get_parameter('model_type').get_parameter_value().string_value
         input_mode = self.get_parameter('input_mode').get_parameter_value().string_value
 
         # Determine model path
-        if model_type == 'fine_tuned':
-            model_path = '/home/mohsin/official_build/ros2_ws/models/fine_tuned.pt'
+        if model_path_param:
+            model_path = model_path_param
+        elif model_type == 'fine_tuned':
+            # Fallback for legacy support, but user should prefer model_path
+            model_path = os.path.join(os.getcwd(), 'ros2_ws', 'models', 'fine_tuned.pt')
         else:
-            model_path = '/home/mohsin/official_build/ros2_ws/models/yolov8n.pt'
+            model_path = 'yolov8n.pt'  # Ultralytics will download/find this
 
-        self.get_logger().info(f"Using model type '{model_type}' from: {model_path}")
+        self.get_logger().info(f"Using model from: {model_path}")
         self.model = YOLO(model_path)
 
         # Determine image topic
@@ -37,8 +52,12 @@ class YoloDetectorNode(Node):
         elif input_mode == 'realsense':
             image_topic = '/camera/camera/color/image_raw'
         else:
-            self.get_logger().warn(f"Unknown input_mode '{input_mode}', defaulting to 'realsense'")
-            image_topic = '/camera/camera/color/image_raw'
+            # Check if input_mode is actually a topic name
+            if input_mode.startswith('/'):
+                 image_topic = input_mode
+            else:
+                 self.get_logger().warn(f"Unknown input_mode '{input_mode}', defaulting to 'realsense'")
+                 image_topic = '/camera/camera/color/image_raw'
 
         self.get_logger().info(f"Subscribing to image topic: {image_topic}")
 

@@ -4,7 +4,7 @@
   <name>perception</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
-  <maintainer email="">mohsin</maintainer>
+  <maintainer email="mohsin@todo.todo">mohsin</maintainer>
   <license>TODO: License declaration</license>
 
   <depend>sensor_msgs</depend>
