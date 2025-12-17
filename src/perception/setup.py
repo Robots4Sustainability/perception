@@ -31,6 +31,7 @@ setup(
             "classifier_node = perception.object_classifier_node:main",
             "pose_node = perception.pose_pca:main",
             "table_segmentation_node = perception.table_segmentation:main",
+            "segment_object_node = perception.segment_object:main",
         ],
     },
 )
