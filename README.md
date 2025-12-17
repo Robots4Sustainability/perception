@@ -9,6 +9,7 @@ This repository provides a complete vision pipeline that supports object detecti
 
 ## Table of Contents
 
+- [Release_3](#Release_3)
 - [Cloning the Repository](#cloning-the-repository)
 - [Project Structure](#project-structure)
 - [Pose Estimation Setup](#pose-estimation-setup)
@@ -225,3 +226,9 @@ ros2_ws/src/perception/rviz/pose_estimation.rviz
    ```
 
 6. Use `Inference.ipynb` to test the trained model.
+
+# Release_3
+[Table_Segmentation](https://github.com/Robots4Sustainability/perception/tree/dev/Feature_Readme/Table_Segmentation_Readme)
+[Table_Height](https://github.com/Robots4Sustainability/perception/blob/dev/Feature_Readme/Table_Height_Readme/README.md)
+[Action_Server](https://github.com/Robots4Sustainability/perception/blob/dev/Feature_Readme/Action_Server_Readme/README.md)
+[Tool_Detection](https://github.com/Robots4Sustainability/perception/blob/dev/Feature_Readme/Tool_Detection/README.md)
