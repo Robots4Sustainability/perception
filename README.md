@@ -1,7 +1,6 @@
 # Release_3 Feature Readmes
 - [Table_Segmentation](https://github.com/Robots4Sustainability/perception/tree/dev/Feature_Readme/Table_Segmentation_Readme)
 - [Table_Height](https://github.com/Robots4Sustainability/perception/blob/dev/Feature_Readme/Table_Height_Readme/README.md)
-- [Action_Server](https://github.com/Robots4Sustainability/perception/blob/dev/Feature_Readme/Action_Server_Readme/README.md)
 - [Tool_Detection](https://github.com/Robots4Sustainability/perception/blob/dev/Feature_Readme/Tool_Detection/README.md)
 
 ---
@@ -20,6 +19,7 @@ This repository provides a complete vision pipeline that supports object detecti
 - [Project Structure](#project-structure)
 - [Pose Estimation Setup](#pose-estimation-setup)
 - [Launching the Camera and Robot](#launching-the-camera-and-robot)
+- [Action Pipeline](#action-server)
 - [Running the Nodes](#running-the-nodes)
   - [Option 1: All-in-One Launch (Camera + Nodes)](#1-both-camera-and-the-nodes)
   - [Option 2: Nodes-Only Launch](#2-all-the-nodes-via-one-launch-file)
@@ -110,16 +110,56 @@ export RMW_IMPLEMENTATION=rmw_zenoh_cpp
 your kinova vision node
 ```
 
+To connect the workstation topics to another local PC/Laptop
+```bash
+# Workstation Terminal
+ros2 run rmw_zenoh_cpp rmw_zenohd
+
+
+# Local PC Terminal
+export ZENOH_CONFIG_OVERRIDE='connect/endpoints=["tcp/192.168.1.11:7447"]'
+ros2 run rmw_zenoh_cpp rmw_zenohd
+
+```
+
 Command to run kinova_vision.lanch
 
 ```bash
-ros2 launch kinova_vision kinova_vision.launch.py \
-  device:=192.168.1.12 \
-  depth_registration:=true \
-  color_camera_info_url:=package://kinova_vision/launch/calibration/default_color_calib_1280x720.ini
+ros2 launch kinova_vision kinova_vision.launch.py   device:=192.168.1.12   depth_registration:=true   color_camera_info_url:=file:///home/mohsin/r4s/src/ros2_kortex_vision/launch/calibration/default_color_calib_1280x720.ini depth_camera_info_url:=file:///home/mohsin/r4s/src/ros2_kortex_vision/launch/calibration/default_depth_calib_480x270.ini
 ```
 
 If you get resolution errors then, go to the admin portal of the arm(192.168.1.1X) and then in the Camera settings, set the calibration to 1280x720
+
+---
+
+## Action Server
+
+```bash
+# Terminal 1
+ros2 launch perception action_launch.py
+
+# Terminal 2
+ros2 run perception brain_client <Task_name>
+```
+- table_height 
+- detect_screws
+- car_objects 
+- subdoor_pose 
+- detect_screwdriver 
+- place_object
+
+To Debug/Check Status
+```bash
+# All Nodes
+ for node in $(ros2 lifecycle nodes); do echo -n "$node: "; ros2 lifecycle get $node; done
+
+ # Each Node
+ ros2 lifecycle set /subdoor_node activate
+ ros2 lifecycle get /subdoor_node 
+```
+- configure
+- activate
+- deactivate
 
 ---
 
