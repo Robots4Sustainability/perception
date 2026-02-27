@@ -1,0 +1,13 @@
+# --- GOAL ---
+string task_name           # e.g., 'car_objects', 'table_height', 'screwdriver', 'subdoor', 'screws'
+float32 time_duration
+---
+# --- RESULT ---
+bool success
+string message
+geometry_msgs/PoseStamped[] poses  # Array: Can hold 1 pose (Screwdriver), 4 poses (Subdoor), or many
+float32 estimated_value            # Used for the Table Height (Z-axis offset)
+---
+# --- FEEDBACK ---
+string current_phase       # e.g., "Waking up YOLO-OBB", "Averaging Poses", "Calculating Height"
+float32 time_elapsed
