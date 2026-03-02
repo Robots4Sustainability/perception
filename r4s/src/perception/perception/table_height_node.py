@@ -10,6 +10,7 @@ import cv2
 import torch
 from ultralytics import YOLOWorld, SAM
 from sklearn.linear_model import RANSACRegressor
+from std_msgs.msg import Float32
 
 class TableHeightNode(LifecycleNode):
     def __init__(self):
@@ -30,6 +31,7 @@ class TableHeightNode(LifecycleNode):
         self.marker_pub = None
         self.debug_pc_pub = None
         self.seg_img_pub = None
+        self.height_pub = None
         
         self.img_sub = None
         self.pc_sub = None
@@ -56,6 +58,7 @@ class TableHeightNode(LifecycleNode):
             self.marker_pub = self.create_lifecycle_publisher(MarkerArray, '/table_height_visualization', 10)
             self.debug_pc_pub = self.create_lifecycle_publisher(PointCloud2, '/table_points_debug', 10)
             self.seg_img_pub = self.create_lifecycle_publisher(Image, '/table_segmentation_image', 10)
+            self.height_pub = self.create_lifecycle_publisher(Float32, '/table_height_value', 10)
 
             # 3. Create Subscribers & Synchronizer
             self.img_sub = message_filters.Subscriber(self, Image, self.img_topic)
@@ -94,6 +97,7 @@ class TableHeightNode(LifecycleNode):
         self.destroy_publisher(self.marker_pub)
         self.destroy_publisher(self.debug_pc_pub)
         self.destroy_publisher(self.seg_img_pub)
+        self.destroy_publisher(self.height_pub)
         
         # message_filters.Subscriber doesn't have a direct destroy method, 
         # so we destroy the underlying ROS subscription.
@@ -234,6 +238,10 @@ class TableHeightNode(LifecycleNode):
         if fy is not None:
             height_meters = abs(fy - ty)
             log_msg += f" | Floor Est: {fy:.2f}m | HEIGHT: {height_meters:.3f}m"
+
+            height_msg = Float32()
+            height_msg.data = float(height_meters)
+            self.height_pub.publish(height_msg)
 
             m_floor = Marker()
             m_floor.header = header

@@ -15,8 +15,6 @@ from ultralytics import YOLO
 from ament_index_python.packages import get_package_share_directory
 from pathlib import Path
 
-from std_srvs.srv import SetBool
-
 def get_package_name_from_path(file_path):
     p = Path(file_path)
     try:
@@ -71,19 +69,9 @@ class BodyPoseEstimatorNode(Node):
         self.marker_pub = self.create_publisher(MarkerArray, '/body_markers', 10)
         self.debug_pub = self.create_publisher(Image, '/body_debug_image', 10)
 
-        self.is_active = False
         self.latest_poses = [] # Store the 4 corner points here
         
-        # Create a Service to turn the processing on/off
-        self.srv = self.create_service(SetBool, 'toggle_subdoor_estimation', self.toggle_callback)
-        self.get_logger().info("Subdoor Worker initialized. Waiting for 'toggle_subdoor_estimation' service...")
-
-    def toggle_callback(self, request, response):
-        self.is_active = request.data
-        self.latest_poses = [] # Clear previous results
-        response.success = True
-        response.message = f"Subdoor estimation {'started' if self.is_active else 'stopped'}"
-        return response
+        self.get_logger().info("Subdoor Worker initialized and actively processing...")
 
     def get_xyz_from_cloud(self, cloud_msg, u, v, window=3):
         """Samples a window around (u,v) to avoid NaNs at edges."""
@@ -107,9 +95,6 @@ class BodyPoseEstimatorNode(Node):
         return np.median(points, axis=0).tolist()
 
     def sync_callback(self, img_msg, pc_msg):
-        if not self.is_active:
-            return # Do nothing if the pipeline hasn't woken us up
-
         try:
             cv_image = self.bridge.imgmsg_to_cv2(img_msg, 'bgr8')
         except Exception as e:

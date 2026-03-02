@@ -74,7 +74,7 @@ class PerceptionDispatcher(Node):
         self.create_subscription(Float32, '/screw/radius', self.screw_rad_cb, 10, callback_group=self.group)
         self.create_subscription(PoseStamped, '/car/pose', self.car_pose_cb, 10, callback_group=self.group)
         self.create_subscription(Float32, '/car/radius', self.car_rad_cb, 10, callback_group=self.group)
-        self.create_subscription(MarkerArray, '/table_height_visualization', self.table_cb, 10, callback_group=self.group)
+        self.create_subscription(Float32, '/table_height_value', self.table_cb, 10, callback_group=self.group)
         self.create_subscription(MarkerArray, '/body_markers', self.subdoor_cb, 10, callback_group=self.group)
         self.create_subscription(PoseStamped, '/object_pose_screwdriver', self.screwdriver_cb, 10, callback_group=self.group)
         
@@ -92,11 +92,8 @@ class PerceptionDispatcher(Node):
     def screwdriver_cb(self, msg): self.vision_data['screwdriver'] = msg
     def place_pose_cb(self, msg): self.vision_data['place_pose'] = msg
 
-    def table_cb(self, msg: MarkerArray):
-        for marker in msg.markers:
-            if marker.ns == "table":
-                self.vision_data['table'] = marker.pose.position.z
-                break
+    def table_cb(self, msg: Float32):
+        self.vision_data['table'] = msg.data
 
     def subdoor_cb(self, msg: MarkerArray):
         if msg.markers and msg.markers[0].ns == "corners":
