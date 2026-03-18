@@ -32,6 +32,7 @@ setup(
             "pose_node = perception.pose_pca:main",
             "table_segmentation_node = perception.table_segmentation:main",
             "segment_object_node = perception.segment_object:main",
+            "table_height_node = perception.table_height:main",
         ],
     },
 )
