@@ -2,12 +2,11 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import PointCloud2, PointField
 from std_msgs.msg import Float32, Header
-from geometry_msgs.msg import PointStamped
+from visualization_msgs.msg import Marker, MarkerArray
 
 from tf2_ros import TransformException
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
-import tf2_geometry_msgs 
 
 import sensor_msgs_py.point_cloud2 as pc2
 import open3d as o3d
@@ -39,7 +38,9 @@ class TableHeightNode(Node):
         # Publisher to output the height
         self.height_pub = self.create_publisher(Float32, '/perception/table_height', 10)
 
+        # publishers for rviz
         self.table_cloud_pub = self.create_publisher(PointCloud2, '/perception/debug/table_height_plane', 10)
+        self.viz_pub = self.create_publisher(MarkerArray, '/perception/debug/table_height_viz', 10)
 
         # setup TF2 Listener
         # looks up where the camera is relative to the robot base
@@ -72,6 +73,8 @@ class TableHeightNode(Node):
         # (reject wall and floor planes)
         table_cloud = None
         table_height = 0.0
+        center_x = 0.0
+        center_y = 0.0
         
         for attempt in range(5): # Allow up to 5 planes to be checked
             try:
@@ -110,6 +113,11 @@ class TableHeightNode(Node):
                 # horizontal plane that is not the floor (table hopefully)
                 table_cloud = temp_cloud
                 table_height = avg_z
+
+                # Save the X,Y center for visualization line
+                center_x = float(np.mean(temp_pts[:, 0]))
+                center_y = float(np.mean(temp_pts[:, 1]))
+
                 break
 
         if table_cloud is None or len(table_cloud.points) == 0:
@@ -129,6 +137,66 @@ class TableHeightNode(Node):
 
         table_cloud.paint_uniform_color([0, 1, 0]) 
         self.publish_o3d(table_cloud, self.table_cloud_pub, debug_header)
+
+        # visualize height line and text in RViz
+        self.publish_height_markers(center_x, center_y, table_height, debug_header)
+
+    '''HELPER FUNCTIONS'''
+
+    def publish_height_markers(self, x, y, z, header):
+        marker_array = MarkerArray()
+
+        # vertical cylinder
+        pole = Marker()
+        pole.header = header
+        pole.ns = "table_height"
+        pole.id = 0
+        pole.type = Marker.CYLINDER
+        pole.action = Marker.ADD
+        
+        # Center of the cylinder is halfway between floor and table
+        pole.pose.position.x = x
+        pole.pose.position.y = y
+        pole.pose.position.z = z / 2.0 
+        pole.pose.orientation.w = 1.0
+        
+        # 2cm thick, z meters tall
+        pole.scale.x = 0.02
+        pole.scale.y = 0.02
+        pole.scale.z = z
+        
+        pole.color.r = 1.0
+        pole.color.g = 0.0
+        pole.color.b = 0.0
+        pole.color.a = 1.0
+        
+        marker_array.markers.append(pole)
+
+        # test label
+        text = Marker()
+        text.header = header
+        text.ns = "table_height"
+        text.id = 1
+        text.type = Marker.TEXT_VIEW_FACING
+        text.action = Marker.ADD
+        
+        text.pose.position.x = x
+        text.pose.position.y = y + 0.05
+        text.pose.position.z = z / 2.0
+        text.pose.orientation.w = 1.0
+        
+        text.text = f"Height:{z:.3f}m"
+        text.scale.x = 0.05
+        text.scale.z = 0.08
+        
+        text.color.r = 1.0
+        text.color.g = 1.0
+        text.color.b = 1.0
+        text.color.a = 1.0
+        
+        marker_array.markers.append(text)
+
+        self.viz_pub.publish(marker_array)
 
     def transform_to_matrix(self, transform_stamped):
         """Converts a ROS TransformStamped into a 4x4 numpy transformation matrix."""
