@@ -1,7 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import PointCloud2, PointField
-from std_msgs.msg import Float32
+from std_msgs.msg import Float32, Header
 from geometry_msgs.msg import PointStamped
 
 from tf2_ros import TransformException
@@ -42,94 +42,114 @@ class TableHeightNode(Node):
         self.table_cloud_pub = self.create_publisher(PointCloud2, '/perception/debug/table_height_plane', 10)
 
         # setup TF2 Listener
-        # the node looks up where the camera is relative to the robot base
+        # looks up where the camera is relative to the robot base
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
     def cloud_callback(self, ros_cloud_msg):
-        pcd = self.convert_ros_to_o3d(ros_cloud_msg)
-        if pcd is None: return
+        # Look up the transform from camera to base
+        try:
+            transform_stamped = self.tf_buffer.lookup_transform(
+                self.base_frame,             
+                ros_cloud_msg.header.frame_id, 
+                rclpy.time.Time()            
+            )
+        except TransformException as ex:
+            self.get_logger().warn(f"TF Error: {ex}")
+            return
 
-        # Depth Cutoff
-        points = np.asarray(pcd.points)
-        if len(points) == 0: return
-        mask = points[:, 2] < 1.5 
-        pcd = pcd.select_by_index(np.where(mask)[0])
-        
+        pcd = self.convert_ros_to_o3d(ros_cloud_msg)
+        if pcd is None or len(pcd.points) == 0: return
+
+        # transform the whole cloud to the base frame so that we can analyze it relative to the robot's floor
+        # z is up relative to gravity
+        tf_matrix = self.transform_to_matrix(transform_stamped)
+        pcd.transform(tf_matrix)
+
         pcd_down = pcd.voxel_down_sample(voxel_size=0.01)
 
-        # reject walls (Iterative RANSAC)
+        # iterative ransac until we find a horizontal plane that is above the floor height threshold
+        # (reject wall and floor planes)
         table_cloud = None
+        table_height = 0.0
         
-        for attempt in range(3): # Try up to 3 times to find the real table
+        for attempt in range(5): # Allow up to 5 planes to be checked
             try:
-                plane_model, inliers = pcd_down.segment_plane(distance_threshold=0.01,
+                plane_model, inliers = pcd_down.segment_plane(distance_threshold=0.015,
                                                             ransac_n=3,
                                                             num_iterations=1000)
             except Exception:
-                break # No more planes found
+                break 
 
-            # Extract this plane
             temp_cloud = pcd_down.select_by_index(inliers)
             temp_pts = np.asarray(temp_cloud.points)
             
-            # Calculate how far away this plane is from the camera
+            # Normal Vector [a, b, c]
+            a, b, c, d = plane_model
+            
+            # c represents how much the normal points along the z axis.
+            # abs(c) = 1.0 = perfectly flat
+            # abs(c) = 0.0 = perfectly vertical
+            # > 0.85 allows for up to ~30 degrees of tilt.
+            is_horizontal = abs(c) > 0.85 
+            
+            # Since the cloud is in the base frame, the Z coordinate is the physical height
             avg_z = np.mean(temp_pts[:, 2])
 
-            # If the plane is further than 0.85 meters, it could be wall
-            # tune treshold based on tests
-            # TODO: maybe also check the plane normal to see if it's vertical? (walls) vs horizontal? (table)
-            if avg_z > 1.3: 
-                self.get_logger().info(f"Ignoring a wall/floor at {avg_z:.2f}m away...")
-                # Invert the selection to REMOVE the wall points, then loop again
+            if not is_horizontal:
+                # self.get_logger().info("Ignoring wall")
                 pcd_down = pcd_down.select_by_index(inliers, invert=True)
                 continue
+                
+            elif avg_z < 0.2: # Assuming table is higher than 20cm
+                # self.get_logger().info(f"Ignoring the floor at height {avg_z:.2f}m...")
+                pcd_down = pcd_down.select_by_index(inliers, invert=True)
+                continue
+                
             else:
-                # plane that is close to the camera is the table
+                # horizontal plane that is not the floor (table hopefully)
                 table_cloud = temp_cloud
+                table_height = avg_z
                 break
 
-        # Safety check if we filtered out everything
         if table_cloud is None or len(table_cloud.points) == 0:
             return 
 
-        # Visualize the Table in RViz
-        table_cloud.paint_uniform_color([0, 1, 0]) # Paint it Green
-        self.publish_o3d(table_cloud, self.table_cloud_pub, ros_cloud_msg.header)
+        # publish height
+        msg = Float32()
+        msg.data = float(table_height)
+        self.height_pub.publish(msg)
+        self.get_logger().info(f"Table Height from '{self.base_frame}': {table_height:.3f} meters")
 
-        # Find the center point
-        table_pts = np.asarray(table_cloud.points)
-        center_x = np.mean(table_pts[:, 0])
-        center_y = np.mean(table_pts[:, 1])
-        center_z = np.mean(table_pts[:, 2])
+        # Visualize the table in rviz
+        # (Since we transformed the cloud, tell RViz this cloud is in the base_frame)
+        debug_header = Header()
+        debug_header.stamp = ros_cloud_msg.header.stamp
+        debug_header.frame_id = self.base_frame
 
-        camera_point = PointStamped()
-        camera_point.header = ros_cloud_msg.header
-        camera_point.point.x = float(center_x)
-        camera_point.point.y = float(center_y)
-        camera_point.point.z = float(center_z)
+        table_cloud.paint_uniform_color([0, 1, 0]) 
+        self.publish_o3d(table_cloud, self.table_cloud_pub, debug_header)
 
-        # Transform to Base Frame
-        try:
-            transform = self.tf_buffer.lookup_transform(
-                self.base_frame,             
-                camera_point.header.frame_id, 
-                rclpy.time.Time()            
-            )
+    def transform_to_matrix(self, transform_stamped):
+        """Converts a ROS TransformStamped into a 4x4 numpy transformation matrix."""
+        t = transform_stamped.transform.translation
+        q = transform_stamped.transform.rotation
 
-            base_point = tf2_geometry_msgs.do_transform_point(camera_point, transform)
+        # Quaternion to Rotation Matrix
+        x, y, z, w = q.x, q.y, q.z, q.w
+        R = np.array([
+                    [1 - 2*y*y - 2*z*z, 2*x*y - 2*w*z, 2*x*z + 2*w*y],
+                    [2*x*y + 2*w*z, 1 - 2*x*x - 2*z*z, 2*y*z - 2*w*x],
+                    [2*x*z - 2*w*y, 2*y*z + 2*w*x, 1 - 2*x*x - 2*y*y]
+                    ])
 
-            # Extract height
-            table_height = base_point.point.z
-
-            msg = Float32()
-            msg.data = table_height
-            self.height_pub.publish(msg)
-
-            self.get_logger().info(f"Table Height from '{self.base_frame}': {table_height:.3f} meters")
-
-        except TransformException as ex:
-            self.get_logger().warn(f"TF Error: {ex}")
+        # Build 4x4 Matrix
+        matrix = np.eye(4)
+        matrix[:3, :3] = R
+        matrix[0, 3] = t.x
+        matrix[1, 3] = t.y
+        matrix[2, 3] = t.z
+        return matrix
 
 
     def convert_ros_to_o3d(self, ros_cloud):
