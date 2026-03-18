@@ -1,6 +1,6 @@
 ### Running Table Height
-```code
-ros2 run table_height_predictor table_heigt
+```
+ros2 run perception table_height
 ```
 ### Running Floor Detection
 ```
@@ -19,4 +19,3 @@ desk.
 
 - It has an error rate of +-5cm to the actual height so it should be used with a safety margin. In the example above the actual height was 58cm.
 - This can work with varying heights of the table.
-

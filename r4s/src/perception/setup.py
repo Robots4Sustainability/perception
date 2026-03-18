@@ -19,7 +19,13 @@ setup(
         # Install launch files
         (os.path.join('share', package_name, 'launch'), glob('launch/*.py')),
     ],
-    install_requires=['setuptools'],
+    install_requires=[
+        'setuptools',
+        'open3d',
+        'scikit-learn',
+        'numpy',
+        'opencv-python'
+    ],
     zip_safe=True,
     maintainer='mohsin',
     maintainer_email='mohsinalimirxa@gmail.com',
