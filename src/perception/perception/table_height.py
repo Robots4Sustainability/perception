@@ -7,6 +7,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 from tf2_ros import TransformException
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
+from geometry_msgs.msg import PointStamped, PoseStamped
 
 import sensor_msgs_py.point_cloud2 as pc2
 import open3d as o3d
@@ -35,8 +36,9 @@ class TableHeightNode(Node):
 
         self.pc_sub = self.create_subscription(PointCloud2, pc_topic, self.cloud_callback, 10)
         
-        # Publisher to output the height
+        # Publishers to output the height and pose of table
         self.height_pub = self.create_publisher(Float32, '/perception/table_height', 10)
+        self.pose_pub = self.create_publisher(PoseStamped, '/perception/table_pose', 10)
 
         # publishers for rviz
         self.table_cloud_pub = self.create_publisher(PointCloud2, '/perception/debug/table_height_plane', 10)
@@ -75,6 +77,7 @@ class TableHeightNode(Node):
         table_height = 0.0
         center_x = 0.0
         center_y = 0.0
+        final_plane_model = None
         
         for attempt in range(5): # Allow up to 5 planes to be checked
             try:
@@ -118,6 +121,8 @@ class TableHeightNode(Node):
                 center_x = float(np.mean(temp_pts[:, 0]))
                 center_y = float(np.mean(temp_pts[:, 1]))
 
+                final_plane_model = plane_model
+
                 break
 
         if table_cloud is None or len(table_cloud.points) == 0:
@@ -131,17 +136,71 @@ class TableHeightNode(Node):
 
         # Visualize the table in rviz
         # (Since we transformed the cloud, tell RViz this cloud is in the base_frame)
-        debug_header = Header()
-        debug_header.stamp = ros_cloud_msg.header.stamp
-        debug_header.frame_id = self.base_frame
+        header = Header()
+        header.stamp = ros_cloud_msg.header.stamp
+        header.frame_id = self.base_frame
 
+        # publish pose
+        quat = self.get_surface_orientation(final_plane_model)
+        
+        pose_msg = PoseStamped()
+        pose_msg.header = header
+        pose_msg.pose.position.x = center_x
+        pose_msg.pose.position.y = center_y
+        pose_msg.pose.position.z = table_height
+        pose_msg.pose.orientation.x = float(quat[0])
+        pose_msg.pose.orientation.y = float(quat[1])
+        pose_msg.pose.orientation.z = float(quat[2])
+        pose_msg.pose.orientation.w = float(quat[3])
+        
+        self.pose_pub.publish(pose_msg)
+
+        # Visualize Cloud and Markers
         table_cloud.paint_uniform_color([0, 1, 0]) 
-        self.publish_o3d(table_cloud, self.table_cloud_pub, debug_header)
+        self.publish_o3d(table_cloud, self.table_cloud_pub, header)
+        self.publish_height_markers(center_x, center_y, table_height, header)
 
-        # visualize height line and text in RViz
-        self.publish_height_markers(center_x, center_y, table_height, debug_header)
+    def get_surface_orientation(self, plane_model):
+        """
+        Creates a Quaternion where the Z-Axis points perfectly up out of the table surface.
+        """
+        normal = np.array(plane_model[:3])
+        normal = normal / np.linalg.norm(normal)
 
-    '''HELPER FUNCTIONS'''
+        # Ensure the normal vector points up (+z).
+        if normal[2] < 0:
+            target_z = -normal
+        else:
+            target_z = normal
+
+        # Construct orthogonal axes 
+        # X and Y flat on the table, Z pointing up
+        # use the world X-axis as a reference direction for the table's X-axis
+        ref_x = np.array([1, 0, 0])
+        
+        # Y = Z cross X
+        target_y = np.cross(target_z, ref_x)
+        target_y = target_y / np.linalg.norm(target_y)
+
+        # Recompute X = Y cross Z (ensure perfectly 90 degrees)
+        target_x = np.cross(target_y, target_z)
+        target_x = target_x / np.linalg.norm(target_x)
+
+        # Rotation Matrix [ X  Y  Z ]
+        R = np.array([target_x, target_y, target_z]).T
+
+        # Convert to Quaternion [x, y, z, w]
+        tr = np.trace(R)
+        if tr > 0:
+            S = np.sqrt(tr + 1.0) * 2; qw = 0.25 * S; qx = (R[2,1] - R[1,2]) / S; qy = (R[0,2] - R[2,0]) / S; qz = (R[1,0] - R[0,1]) / S 
+        elif (R[0,0] > R[1,1]) and (R[0,0] > R[2,2]):
+            S = np.sqrt(1.0 + R[0,0] - R[1,1] - R[2,2]) * 2; qw = (R[2,1] - R[1,2]) / S; qx = 0.25 * S; qy = (R[0,1] + R[1,0]) / S; qz = (R[0,2] + R[2,0]) / S
+        elif (R[1,1] > R[2,2]):
+            S = np.sqrt(1.0 + R[1,1] - R[0,0] - R[2,2]) * 2; qw = (R[0,2] - R[2,0]) / S; qx = (R[0,1] + R[1,0]) / S; qy = 0.25 * S; qz = (R[1,2] + R[2,1]) / S
+        else:
+            S = np.sqrt(1.0 + R[2,2] - R[0,0] - R[1,1]) * 2; qw = (R[1,0] - R[0,1]) / S; qx = (R[0,2] + R[2,0]) / S; qy = (R[1,2] + R[2,1]) / S; qz = 0.25 * S
+
+        return[qx, qy, qz, qw]
 
     def publish_height_markers(self, x, y, z, header):
         marker_array = MarkerArray()
@@ -160,7 +219,6 @@ class TableHeightNode(Node):
         pole.pose.position.z = z / 2.0 
         pole.pose.orientation.w = 1.0
         
-        # 2cm thick, z meters tall
         pole.scale.x = 0.02
         pole.scale.y = 0.02
         pole.scale.z = z

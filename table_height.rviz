@@ -1,13 +1,16 @@
 Panels:
   - Class: rviz_common/Displays
-    Help Height: 138
+    Help Height: 0
     Name: Displays
     Property Tree Widget:
       Expanded:
         - /Global Options1
         - /PointCloud21/Topic1
-      Splitter Ratio: 0.3277909755706787
-    Tree Height: 585
+        - /MarkerArray1
+        - /Image1/Topic1
+        - /Pose1
+      Splitter Ratio: 0.33522728085517883
+    Tree Height: 631
   - Class: rviz_common/Selection
     Name: Selection
   - Class: rviz_common/Tool Properties
@@ -73,47 +76,38 @@ Visualization Manager:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_front_left_drive_attachment_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_front_left_drive_l_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_front_left_drive_r_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_front_left_drive_struct_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_front_right_drive_attachment_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_front_right_drive_l_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_front_right_drive_r_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_front_right_drive_struct_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_front_right_laser_attachment_link:
           Alpha: 1
           Show Axes: false
@@ -122,7 +116,6 @@ Visualization Manager:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_imu_link:
           Alpha: 1
           Show Axes: false
@@ -176,7 +169,6 @@ Visualization Manager:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_left_arm_robotiq_85_grasp_link:
           Alpha: 1
           Show Axes: false
@@ -185,42 +177,34 @@ Visualization Manager:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_left_arm_robotiq_85_left_finger_tip_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_left_arm_robotiq_85_left_inner_knuckle_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_left_arm_robotiq_85_left_knuckle_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_left_arm_robotiq_85_right_finger_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_left_arm_robotiq_85_right_finger_tip_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_left_arm_robotiq_85_right_inner_knuckle_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_left_arm_robotiq_85_right_knuckle_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_left_arm_shoulder_link:
           Alpha: 1
           Show Axes: false
@@ -240,22 +224,18 @@ Visualization Manager:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_rear_left_drive_l_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_rear_left_drive_r_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_rear_left_drive_struct_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_rear_left_laser_attachment_link:
           Alpha: 1
           Show Axes: false
@@ -264,27 +244,22 @@ Visualization Manager:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_rear_right_drive_attachment_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_rear_right_drive_l_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_rear_right_drive_r_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_rear_right_drive_struct_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_right_arm_attachment_link:
           Alpha: 1
           Show Axes: false
@@ -334,7 +309,6 @@ Visualization Manager:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_right_arm_robotiq_85_grasp_link:
           Alpha: 1
           Show Axes: false
@@ -343,42 +317,34 @@ Visualization Manager:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_right_arm_robotiq_85_left_finger_tip_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_right_arm_robotiq_85_left_inner_knuckle_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_right_arm_robotiq_85_left_knuckle_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_right_arm_robotiq_85_right_finger_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_right_arm_robotiq_85_right_finger_tip_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_right_arm_robotiq_85_right_inner_knuckle_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_right_arm_robotiq_85_right_knuckle_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
         eddie_right_arm_shoulder_link:
           Alpha: 1
           Show Axes: false
@@ -403,205 +369,21 @@ Visualization Manager:
       Value: true
       Visual Enabled: true
     - Class: rviz_default_plugins/TF
-      Enabled: true
+      Enabled: false
       Filter (blacklist): ""
       Filter (whitelist): ""
       Frame Timeout: 15
       Frames:
         All Enabled: false
-        eddie_base_footprint:
-          Value: true
-        eddie_base_link:
-          Value: false
-        eddie_front_left_drive_attachment_link:
-          Value: false
-        eddie_front_left_drive_l_wheel_link:
-          Value: false
-        eddie_front_left_drive_r_wheel_link:
-          Value: false
-        eddie_front_left_drive_struct_link:
-          Value: false
-        eddie_front_right_drive_attachment_link:
-          Value: false
-        eddie_front_right_drive_l_wheel_link:
-          Value: false
-        eddie_front_right_drive_r_wheel_link:
-          Value: false
-        eddie_front_right_drive_struct_link:
-          Value: false
-        eddie_front_right_laser_attachment_link:
-          Value: true
-        eddie_front_right_laser_link:
-          Value: true
-        eddie_imu_link:
-          Value: true
-        eddie_left_arm_attachment_link:
-          Value: false
-        eddie_left_arm_base_link:
-          Value: false
-        eddie_left_arm_bracelet_link:
-          Value: false
-        eddie_left_arm_camera_color_frame:
-          Value: false
-        eddie_left_arm_camera_depth_frame:
-          Value: false
-        eddie_left_arm_camera_link:
-          Value: false
-        eddie_left_arm_end_effector_link:
-          Value: false
-        eddie_left_arm_robotiq_85_base_link:
-          Value: true
-        eddie_left_arm_robotiq_85_grasp_link:
-          Value: true
-        eddie_left_arm_robotiq_85_left_finger_link:
-          Value: true
-        eddie_left_arm_robotiq_85_left_knuckle_link:
-          Value: true
-        eddie_left_arm_robotiq_85_right_finger_link:
-          Value: true
-        eddie_left_arm_robotiq_85_right_knuckle_link:
-          Value: true
-        eddie_rear_left_drive_attachment_link:
-          Value: false
-        eddie_rear_left_drive_l_wheel_link:
-          Value: false
-        eddie_rear_left_drive_r_wheel_link:
-          Value: false
-        eddie_rear_left_drive_struct_link:
-          Value: false
-        eddie_rear_left_laser_attachment_link:
-          Value: true
-        eddie_rear_left_laser_link:
-          Value: true
-        eddie_rear_right_drive_attachment_link:
-          Value: false
-        eddie_rear_right_drive_l_wheel_link:
-          Value: false
-        eddie_rear_right_drive_r_wheel_link:
-          Value: false
-        eddie_rear_right_drive_struct_link:
-          Value: false
-        eddie_right_arm_attachment_link:
-          Value: false
-        eddie_right_arm_base_link:
-          Value: false
-        eddie_right_arm_bracelet_link:
-          Value: false
-        eddie_right_arm_camera_color_frame:
-          Value: false
-        eddie_right_arm_camera_depth_frame:
-          Value: false
-        eddie_right_arm_camera_link:
-          Value: false
-        eddie_right_arm_end_effector_link:
-          Value: false
-        eddie_right_arm_forearm_link:
-          Value: false
-        eddie_right_arm_half_arm_1_link:
-          Value: false
-        eddie_right_arm_half_arm_2_link:
-          Value: false
-        eddie_right_arm_robotiq_85_base_link:
-          Value: true
-        eddie_right_arm_robotiq_85_grasp_link:
-          Value: true
-        eddie_right_arm_robotiq_85_left_finger_link:
-          Value: true
-        eddie_right_arm_robotiq_85_left_finger_tip_link:
-          Value: true
-        eddie_right_arm_robotiq_85_left_inner_knuckle_link:
-          Value: true
-        eddie_right_arm_robotiq_85_left_knuckle_link:
-          Value: true
-        eddie_right_arm_robotiq_85_right_finger_link:
-          Value: true
-        eddie_right_arm_robotiq_85_right_finger_tip_link:
-          Value: true
-        eddie_right_arm_robotiq_85_right_inner_knuckle_link:
-          Value: true
-        eddie_right_arm_robotiq_85_right_knuckle_link:
-          Value: true
-        eddie_right_arm_shoulder_link:
-          Value: false
-        eddie_right_arm_spherical_wrist_1_link:
-          Value: false
-        eddie_right_arm_spherical_wrist_2_link:
-          Value: false
       Marker Scale: 1
       Name: TF
       Show Arrows: true
       Show Axes: true
       Show Names: false
       Tree:
-        eddie_base_footprint:
-          eddie_base_link:
-            eddie_front_left_drive_attachment_link:
-              eddie_front_left_drive_struct_link:
-                eddie_front_left_drive_l_wheel_link:
-                  {}
-                eddie_front_left_drive_r_wheel_link:
-                  {}
-            eddie_front_right_drive_attachment_link:
-              eddie_front_right_drive_struct_link:
-                eddie_front_right_drive_l_wheel_link:
-                  {}
-                eddie_front_right_drive_r_wheel_link:
-                  {}
-            eddie_front_right_laser_attachment_link:
-              eddie_front_right_laser_link:
-                {}
-            eddie_imu_link:
-              {}
-            eddie_left_arm_attachment_link:
-              eddie_left_arm_base_link:
-                {}
-            eddie_rear_left_drive_attachment_link:
-              eddie_rear_left_drive_struct_link:
-                eddie_rear_left_drive_l_wheel_link:
-                  {}
-                eddie_rear_left_drive_r_wheel_link:
-                  {}
-            eddie_rear_left_laser_attachment_link:
-              eddie_rear_left_laser_link:
-                {}
-            eddie_rear_right_drive_attachment_link:
-              eddie_rear_right_drive_struct_link:
-                eddie_rear_right_drive_l_wheel_link:
-                  {}
-                eddie_rear_right_drive_r_wheel_link:
-                  {}
-            eddie_right_arm_attachment_link:
-              eddie_right_arm_base_link:
-                eddie_right_arm_shoulder_link:
-                  eddie_right_arm_half_arm_1_link:
-                    eddie_right_arm_half_arm_2_link:
-                      eddie_right_arm_forearm_link:
-                        eddie_right_arm_spherical_wrist_1_link:
-                          eddie_right_arm_spherical_wrist_2_link:
-                            eddie_right_arm_bracelet_link:
-                              eddie_right_arm_end_effector_link:
-                                eddie_right_arm_camera_link:
-                                  eddie_right_arm_camera_color_frame:
-                                    {}
-                                  eddie_right_arm_camera_depth_frame:
-                                    {}
-                                eddie_right_arm_robotiq_85_base_link:
-                                  eddie_right_arm_robotiq_85_grasp_link:
-                                    {}
-                                  eddie_right_arm_robotiq_85_left_inner_knuckle_link:
-                                    {}
-                                  eddie_right_arm_robotiq_85_left_knuckle_link:
-                                    eddie_right_arm_robotiq_85_left_finger_link:
-                                      eddie_right_arm_robotiq_85_left_finger_tip_link:
-                                        {}
-                                  eddie_right_arm_robotiq_85_right_inner_knuckle_link:
-                                    {}
-                                  eddie_right_arm_robotiq_85_right_knuckle_link:
-                                    eddie_right_arm_robotiq_85_right_finger_link:
-                                      eddie_right_arm_robotiq_85_right_finger_tip_link:
-                                        {}
+        {}
       Update Interval: 0
-      Value: true
+      Value: false
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -614,7 +396,7 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: RGB8
       Decay Time: 0
-      Enabled: true
+      Enabled: false
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Max Intensity: 4096
@@ -634,7 +416,7 @@ Visualization Manager:
         Value: /camera/depth/color/points
       Use Fixed Frame: true
       Use rainbow: true
-      Value: true
+      Value: false
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -667,6 +449,52 @@ Visualization Manager:
         Value: /perception/debug/table_height_plane
       Use Fixed Frame: true
       Use rainbow: true
+      Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: MarkerArray
+      Namespaces:
+        table_height: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /perception/debug/table_height_viz
+      Value: true
+    - Class: rviz_default_plugins/Image
+      Enabled: true
+      Max Value: 1
+      Median window: 5
+      Min Value: 0
+      Name: Image
+      Normalize Range: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /camera/color/image_raw
+      Value: true
+    - Alpha: 1
+      Axes Length: 0.20000000298023224
+      Axes Radius: 0.029999999329447746
+      Class: rviz_default_plugins/Pose
+      Color: 255; 25; 0
+      Enabled: true
+      Head Length: 0.30000001192092896
+      Head Radius: 0.10000000149011612
+      Name: Pose
+      Shaft Length: 1
+      Shaft Radius: 0.05000000074505806
+      Shape: Axes
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /perception/table_pose
       Value: true
   Enabled: true
   Global Options:
@@ -714,25 +542,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 3.545147180557251
+      Distance: 2.417529582977295
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.1534285843372345
-        Y: -1.06831693649292
-        Z: 0.3183233141899109
+        X: 0.3144458532333374
+        Y: -1.395922303199768
+        Z: 0.5834709405899048
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.7797964811325073
+      Pitch: 0.34479573369026184
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 0.6854299306869507
+      Yaw: 0.7554277181625366
     Saved: ~
 Window Geometry:
   Displays:
@@ -740,7 +568,9 @@ Window Geometry:
   Height: 1003
   Hide Left Dock: false
   Hide Right Dock: false
-  QMainWindow State: 000000ff00000000fd00000004000000000000026c0000031cfc0200000008fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000006f00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c00610079007301000000480000031c000000f300fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261000000010000015d0000031cfc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a0056006900650077007301000000480000031c000000c500fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e100000197000000030000073e0000005efc0100000002fb0000000800540069006d006501000000000000073e000002dc00fffffffb0000000800540069006d00650100000000000004500000000000000000000003670000031c00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  Image:
+    collapsed: false
+  QMainWindow State: 000000ff00000000fd0000000400000000000002120000031cfc020000000cfb0000001200530065006c0065006300740069006f006e00000001e10000009b0000006f00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c0061007900730100000048000002c0000000f300fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000a0049006d0061006700650000000000ffffffff0000000000000000fb0000000c00430061006d00650072006100000002470000011d0000000000000000fb0000000a0049006d00610067006501000001a8000001bc0000000000000000fb0000000a0049006d006100670065010000030f000000550000001a00ffffff000000010000015d0000031cfc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a0056006900650077007301000000480000031c000000c500fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e100000197000000030000073e0000005efc0100000002fb0000000800540069006d006501000000000000073e000002dc00fffffffb0000000800540069006d00650100000000000004500000000000000000000003c10000031c00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
