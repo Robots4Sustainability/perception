@@ -62,6 +62,7 @@ class PerceptionDispatcher(Node):
             'screw': {'pose': None, 'radius': None},
             'car object': {'pose': None, 'radius': None},
             'table': None,
+            'table_pose': None,
             'subdoor': None,
             'screwdriver': None,
             'place_pose': None
@@ -77,6 +78,7 @@ class PerceptionDispatcher(Node):
         self.create_subscription(Float32, '/table_height_value', self.table_cb, 10, callback_group=self.group)
         self.create_subscription(MarkerArray, '/body_markers', self.subdoor_cb, 10, callback_group=self.group)
         self.create_subscription(PoseStamped, '/object_pose_screwdriver', self.screwdriver_cb, 10, callback_group=self.group)
+        self.create_subscription(PoseStamped, '/perception/table_pose', self.table_pose_cb, 10, callback_group=self.group)
         
         # NEW: Listen to the placement pose calculated by the table segmentation node
         self.create_subscription(PoseStamped, '/perception/target_place_pose', self.place_pose_cb, 10, callback_group=self.group)
@@ -94,6 +96,9 @@ class PerceptionDispatcher(Node):
 
     def table_cb(self, msg: Float32):
         self.vision_data['table'] = msg.data
+
+    def table_pose_cb(self, msg): 
+        self.vision_data['table_pose'] = msg
 
     def subdoor_cb(self, msg: MarkerArray):
         if msg.markers and msg.markers[0].ns == "corners":
@@ -212,6 +217,7 @@ class PerceptionDispatcher(Node):
         return result
 
     # --- TASK HANDLERS ---
+    '''
     async def handle_table_height(self, goal_handle):
         feedback_msg, result_msg = RunVision.Feedback(), RunVision.Result()
         self.vision_data['table'] = None # Clear old data
@@ -237,7 +243,36 @@ class PerceptionDispatcher(Node):
             result_msg.success, result_msg.message = True, f"Table Height: {self.vision_data['table']:.3f} meters"
         else:
             result_msg.success, result_msg.message = False, "Vision processing timed out."
-        return result_msg 
+        return result_msg
+        '''
+    
+    async def handle_table_height(self, goal_handle):
+        feedback_msg, result_msg = RunVision.Feedback(), RunVision.Result()
+        self.vision_data['table_pose'] = None # Clear old data
+
+        feedback_msg.current_phase = "Activating Table Estimator..."
+        goal_handle.publish_feedback(feedback_msg)
+        await self._change_lifecycle_state(self.table_lifecycle_client, Transition.TRANSITION_ACTIVATE)
+
+        feedback_msg.current_phase = "Waiting for table pose..."
+        goal_handle.publish_feedback(feedback_msg)
+
+        # Wait for the pose
+        for _ in range(150):
+            if self.vision_data['table_pose'] is not None: break
+            await asyncio.sleep(0.1)
+
+        await self._change_lifecycle_state(self.table_lifecycle_client, Transition.TRANSITION_DEACTIVATE)
+
+        pose = self.vision_data['table_pose']
+        if pose is not None:
+            result_msg.success = True
+            x, y, z = pose.pose.position.x, pose.pose.position.y, pose.pose.position.z
+            result_msg.message = f"Table Pose Found: [x: {x:.3f}, y: {y:.3f}, z: {z:.3f} (Height)]"
+        else:
+            result_msg.success, result_msg.message = False, "Vision processing timed out."
+        
+        return result_msg
 
     async def handle_detect_yolo(self, goal_handle, yolo_client, cropper_client, object_name):
         feedback_msg, result_msg = RunVision.Feedback(), RunVision.Result()

@@ -1,5 +1,5 @@
 import rclpy
-from rclpy.node import Node
+from rclpy.lifecycle import Node as LifecycleNode, State, TransitionCallbackReturn
 from sensor_msgs.msg import PointCloud2, PointField
 from std_msgs.msg import Float32, Header
 from visualization_msgs.msg import Marker, MarkerArray
@@ -8,6 +8,8 @@ from tf2_ros import TransformException
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 from geometry_msgs.msg import PointStamped, PoseStamped
+from tf2_ros import TransformBroadcaster
+from geometry_msgs.msg import TransformStamped
 
 import sensor_msgs_py.point_cloud2 as pc2
 import open3d as o3d
@@ -15,9 +17,9 @@ import numpy as np
 import struct
 
 
-class TableHeightNode(Node):
+class TableHeightRansac(LifecycleNode):
     def __init__(self):
-        super().__init__('table_height_node')
+        super().__init__('table_height_estimator')
 
         self.declare_parameter('input_mode', 'robot')
         # The frame that represents the floor (eddie_base_footprint?)
@@ -31,6 +33,18 @@ class TableHeightNode(Node):
         else:
             pc_topic = '/camera/camera/depth/color/points'
 
+        # Lifecycle State Flag
+        self._is_active = False
+
+        # TF2 Setup
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.tf_broadcaster = TransformBroadcaster(self)
+
+        self.get_logger().info("Table Height Lifecycle Node Initialized (Unconfigured).")
+
+        '''
+        
         self.get_logger().info(f"Subscribing to: {pc_topic}")
         self.get_logger().info(f"Calculating height relative to frame: {self.base_frame}")
 
@@ -48,8 +62,46 @@ class TableHeightNode(Node):
         # looks up where the camera is relative to the robot base
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
+        '''
 
+    def on_configure(self, state: State) -> TransitionCallbackReturn:
+        self.get_logger().info("Configuring Table Height Estimator...")
+        
+        # Initialize Publishers
+        self.height_pub = self.create_lifecycle_publisher(Float32, '/table_height_value', 10)
+        self.pose_pub = self.create_lifecycle_publisher(PoseStamped, '/perception/table_pose', 10)
+        self.table_cloud_pub = self.create_lifecycle_publisher(PointCloud2, '/perception/debug/table_height_plane', 10)
+        self.viz_pub = self.create_lifecycle_publisher(MarkerArray, '/perception/debug/table_height_viz', 10)
+
+        # Initialize Subscriber
+        self.pc_sub = self.create_subscription(PointCloud2, self.pc_topic, self.cloud_callback, 10)
+
+        self.get_logger().info("Successfully Configured.")
+        return TransitionCallbackReturn.SUCCESS
+
+    def on_activate(self, state: State) -> TransitionCallbackReturn:
+        self.get_logger().info("Activating Table Height Estimator...")
+        self._is_active = True
+        return super().on_activate(state)
+
+    def on_deactivate(self, state: State) -> TransitionCallbackReturn:
+        self.get_logger().info("Deactivating Table Height Estimator...")
+        self._is_active = False
+        return super().on_deactivate(state)
+
+    def on_cleanup(self, state: State) -> TransitionCallbackReturn:
+        self.get_logger().info("Cleaning up Table Height Estimator...")
+        self.destroy_subscription(self.pc_sub)
+        self.destroy_publisher(self.height_pub)
+        self.destroy_publisher(self.pose_pub)
+        self.destroy_publisher(self.table_cloud_pub)
+        self.destroy_publisher(self.viz_pub)
+        return TransitionCallbackReturn.SUCCESS
+    
     def cloud_callback(self, ros_cloud_msg):
+        if not self._is_active:
+            return
+        
         # Look up the transform from camera to base
         try:
             transform_stamped = self.tf_buffer.lookup_transform(
@@ -154,6 +206,13 @@ class TableHeightNode(Node):
         pose_msg.pose.orientation.w = float(quat[3])
         
         self.pose_pub.publish(pose_msg)
+
+        t = TransformStamped()
+        t.header = header
+        t.child_frame_id = 'table_frame' # The frame name for the robot to move to
+        t.transform.translation.x, t.transform.translation.y, t.transform.translation.z = center_x, center_y, table_height
+        t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z, t.transform.rotation.w = quat
+        self.tf_broadcaster.sendTransform(t)
 
         # Visualize Cloud and Markers
         table_cloud.paint_uniform_color([0, 1, 0]) 
@@ -303,9 +362,8 @@ class TableHeightNode(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = TableHeightNode()
+    node = TableHeightRansac()
     rclpy.spin(node)
-    node.destroy_node()
     rclpy.shutdown()
 
 if __name__ == '__main__':
