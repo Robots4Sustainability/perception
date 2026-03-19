@@ -41,8 +41,7 @@ setup(
             "subdoor = perception.subdoor:main",
 
             #3 Table Height
-            "table_height = perception.table_height_node:main",
-            'table_height_ransac = ros_perception_scripts.table_height_ransac:main',
+            'table_height = perception.table_height_ransac:main',
 
 
             #4 Place Object

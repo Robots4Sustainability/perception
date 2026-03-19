@@ -217,34 +217,6 @@ class PerceptionDispatcher(Node):
         return result
 
     # --- TASK HANDLERS ---
-    '''
-    async def handle_table_height(self, goal_handle):
-        feedback_msg, result_msg = RunVision.Feedback(), RunVision.Result()
-        self.vision_data['table'] = None # Clear old data
-
-        feedback_msg.current_phase = "Activating Table Height Node..."
-        goal_handle.publish_feedback(feedback_msg)
-        if not await self._change_lifecycle_state(self.table_lifecycle_client, Transition.TRANSITION_ACTIVATE):
-            result_msg.success, result_msg.message = False, "Failed to activate table node."
-            return result_msg 
-
-        feedback_msg.current_phase = "Waiting for vision data..."
-        goal_handle.publish_feedback(feedback_msg)
-
-        for _ in range(150):
-            if self.vision_data['table'] is not None: break
-            await asyncio.sleep(0.1)
-
-        feedback_msg.current_phase = "Deactivating Table Height Node..."
-        goal_handle.publish_feedback(feedback_msg)
-        await self._change_lifecycle_state(self.table_lifecycle_client, Transition.TRANSITION_DEACTIVATE)
-
-        if self.vision_data['table'] is not None:
-            result_msg.success, result_msg.message = True, f"Table Height: {self.vision_data['table']:.3f} meters"
-        else:
-            result_msg.success, result_msg.message = False, "Vision processing timed out."
-        return result_msg
-        '''
     
     async def handle_table_height(self, goal_handle):
         feedback_msg, result_msg = RunVision.Feedback(), RunVision.Result()
