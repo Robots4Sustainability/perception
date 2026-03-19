@@ -31,7 +31,7 @@ class YoloDetectorLifecycleNode(LifecycleNode):
         self.declare_parameter('model_path', '')           
         self.declare_parameter('conf_threshold', 0.6)      
         self.declare_parameter('device', '')               
-        self.declare_parameter('class_names', [])          
+        self.declare_parameter('class_names', ["motor"])          
 
         # Placeholders for resources
         self.model = None
@@ -44,6 +44,7 @@ class YoloDetectorLifecycleNode(LifecycleNode):
 
         self._is_active = False
         self.get_logger().info('YOLO Detector Lifecycle Node Initialized (Unconfigured).')
+
 
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("Configuring YOLO Node...")
@@ -102,7 +103,7 @@ class YoloDetectorLifecycleNode(LifecycleNode):
             return TransitionCallbackReturn.FAILURE
 
     def on_activate(self, state: State) -> TransitionCallbackReturn:
-        self.get_logger().info("Activating YOLO Node...")
+        self.get_logger().info(f"Activating YOLO Node...")
         super().on_activate(state)
         self._is_active = True
         return TransitionCallbackReturn.SUCCESS

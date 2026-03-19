@@ -10,7 +10,6 @@ import cv2
 import os
 from ament_index_python.packages import get_package_share_directory
 from pathlib import Path 
-from std_msgs.msg import Float32
 
 def get_package_name_from_path(file_path):
     """Dynamically find the package name from the file path."""
@@ -50,16 +49,14 @@ class YoloDetectorNode(Node):
         else:
             # Get the absolute path to the package's share directory
             package_share_directory = get_package_share_directory(self.package_name)
-
-            model_map = {
-            'fine_tuned': 'fine_tuned.pt',
-            'screw':      'screw_best.pt',
-            'default':    'yolov8n.pt'
-            }
             
-            model_filename = model_map.get(model_type, 'yolov8n.pt')
-            model_path = os.path.join(package_share_directory, 'models', model_filename)
-            self.get_logger().info(f"Using model type '{model_type}' from: {model_path}")
+            if model_type == 'fine_tuned':
+                # Construct the path to the model relative to the share directory
+                model_path = os.path.join(package_share_directory, 'models', 'fine_tuned.pt')
+            else:
+                model_path = os.path.join(package_share_directory, 'models', 'yolov8n.pt')
+
+        self.get_logger().info(f"Using model type '{model_type}' from: {model_path}")
 
         try:
             if device_param:
@@ -94,13 +91,12 @@ class YoloDetectorNode(Node):
             self.get_logger().warn(f"Unknown input_mode '{input_mode}', defaulting to 'realsense'")
             image_topic = '/camera/camera/color/image_raw'
 
-        self.get_logger().info(f"Using input_mode '{input_mode}' Subscribing to image topic: {image_topic}")
+        self.get_logger().info(f"Subscribing to image topic: {image_topic}")
 
         # Create subscriptions and publishers
         self.image_sub = self.create_subscription(Image, image_topic, self.image_callback, 10)
         self.annotated_image_pub = self.create_publisher(Image, '/annotated_image', 10)
         self.detection_pub = self.create_publisher(Detection2DArray, '/detections', 10)
-        self.max_dim_pub = self.create_publisher(Float32, '/detections/max_dimension', 10)
 
         self.get_logger().info('YOLOv8 Detector Node started.')
 
@@ -119,8 +115,6 @@ class YoloDetectorNode(Node):
         # This is critical for the PointCloudCropper's Synchronizer
         detection_array_msg = Detection2DArray()
         detection_array_msg.header = msg.header 
-
-        current_frame_max_dim = 0.0
 
         for result in results:
             # Filter by confidence
@@ -162,27 +156,15 @@ class YoloDetectorNode(Node):
 
                 # Bounding Box (XYWH)
                 xywh = box.xywh.cpu().numpy().flatten()
-                w = float(xywh[2]) # Define w
-                h = float(xywh[3]) # Define h
                 detection_msg.bbox.center.position.x = float(xywh[0])
                 detection_msg.bbox.center.position.y = float(xywh[1])
                 detection_msg.bbox.size_x = float(xywh[2])
                 detection_msg.bbox.size_y = float(xywh[3])
 
-                # Track the largest dimension (width or height)
-                max_dim = max(w, h)
-                if max_dim > current_frame_max_dim:
-                    current_frame_max_dim = max_dim
-
                 detection_array_msg.detections.append(detection_msg)
 
         # 5. Single Publish per Image Frame
         self.detection_pub.publish(detection_array_msg)
-
-        if detection_array_msg.detections:
-            dim_msg = Float32()
-            dim_msg.data = current_frame_max_dim
-            self.max_dim_pub.publish(dim_msg)
 
 def main(args=None):
     rclpy.init(args=args)

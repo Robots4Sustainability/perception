@@ -15,6 +15,14 @@ def generate_launch_description():
     input_mode = LaunchConfiguration('input_mode')
     pkg_name = 'perception'
 
+
+    vram_saver_arg = DeclareLaunchArgument(
+        'vram_saver',
+        default_value='true',
+        description="If true, loads models on activate to save VRAM."
+    )
+    vram_saver = LaunchConfiguration('vram_saver')
+
     # --- 2. Lifecycle Nodes ---
 
     # ==========================================
@@ -88,7 +96,11 @@ def generate_launch_description():
         executable='action_yolo_node',   
         name='yolo_car_node',
         namespace='',
-        parameters=[{'model_type': 'fine_tuned', 'input_mode': input_mode}],
+        parameters=[{
+            'model_type': 'fine_tuned', 
+            'input_mode': input_mode,
+            'load_on_activate': vram_saver
+                     }],
         remappings=[
             ('/yolo/detections', '/car/detections') 
         ]

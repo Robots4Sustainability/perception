@@ -12,6 +12,8 @@ from lifecycle_msgs.srv import ChangeState
 from lifecycle_msgs.msg import Transition
 
 from my_robot_interfaces.action import RunVision
+from rcl_interfaces.srv import SetParameters
+from rcl_interfaces.msg import Parameter, ParameterValue, ParameterType
 
 import asyncio
 import threading
@@ -241,46 +243,115 @@ class PerceptionDispatcher(Node):
 
     async def handle_detect_yolo(self, goal_handle, yolo_client, cropper_client, object_name):
         feedback_msg, result_msg = RunVision.Feedback(), RunVision.Result()
+
+        # 1. Capture the requested class from the Action Goal
+        requested_class = goal_handle.request.object_class
         
-        # Clear old data for this specific pipeline
+        # Clear old data for this specific pipeline to prevent stale results
         self.vision_data[object_name]['pose'] = None
         self.vision_data[object_name]['radius'] = None
 
+        # --- DYNAMIC PARAMETER OVERRIDE ---
+        # We set parameters on both nodes BEFORE activation to ensure 
+        # the very first frame processed is correct.
+        if requested_class:
+            self.get_logger().info(f"Targeting specific class for {object_name}: '{requested_class}'")
+            
+            # Target YOLO Node: Update 'class_names' (STRING_ARRAY)
+            yolo_ns = yolo_client.srv_name.replace('/change_state', '')
+            await self._set_remote_parameters(yolo_ns, {
+                'class_names': ParameterValue(
+                    type=ParameterType.PARAMETER_STRING_ARRAY, 
+                    string_array_value=[requested_class]
+                )
+            })
+
+            # Target Cropper Node: Update 'target_class' (STRING)
+            cropper_ns = cropper_client.srv_name.replace('/change_state', '')
+            await self._set_remote_parameters(cropper_ns, {
+                'target_class': ParameterValue(
+                    type=ParameterType.PARAMETER_STRING, 
+                    string_value=requested_class
+                )
+            })
+        else:
+            # If no class requested, reset Cropper to empty string 
+            # to allow "First-Come-First-Served" logic.
+            cropper_ns = cropper_client.srv_name.replace('/change_state', '')
+            await self._set_remote_parameters(cropper_ns, {
+                'target_class': ParameterValue(
+                    type=ParameterType.PARAMETER_STRING, 
+                    string_value=''
+                )
+            })
+
+        # --- LIFECYCLE ACTIVATION ---
         feedback_msg.current_phase = f"Activating Pipeline ({object_name})..."
         goal_handle.publish_feedback(feedback_msg)
 
+        # Activate both nodes
         yolo_success = await self._change_lifecycle_state(yolo_client, Transition.TRANSITION_ACTIVATE)
         cropper_success = await self._change_lifecycle_state(cropper_client, Transition.TRANSITION_ACTIVATE)
 
         if not (yolo_success and cropper_success):
-            result_msg.success, result_msg.message = False, "Failed to activate YOLO/Cropper."
+            result_msg.success, result_msg.message = False, f"Failed to activate {object_name} pipeline."
             return result_msg
 
-        feedback_msg.current_phase = f"Waiting for {object_name} detection..."
+        # --- WAIT FOR VISION DATA ---
+        display_label = requested_class if requested_class else object_name
+        feedback_msg.current_phase = f"Waiting for {display_label} detection..."
         goal_handle.publish_feedback(feedback_msg)
 
+        # Wait loop (up to 15 seconds)
         for _ in range(150):
-            if self.vision_data[object_name]['pose'] is not None and self.vision_data[object_name]['radius'] is not None:
+            if self.vision_data[object_name]['pose'] is not None:
                 break
             await asyncio.sleep(0.1)
 
+        # --- DEACTIVATION ---
         feedback_msg.current_phase = f"Deactivating Pipeline ({object_name})..."
         goal_handle.publish_feedback(feedback_msg)
         
         await self._change_lifecycle_state(cropper_client, Transition.TRANSITION_DEACTIVATE)
         await self._change_lifecycle_state(yolo_client, Transition.TRANSITION_DEACTIVATE)
 
+        # --- RESULT PACKAGING ---
         pose = self.vision_data[object_name]['pose']
         radius = self.vision_data[object_name]['radius']
 
-        if pose is not None and radius is not None:
+        if pose is not None:
             result_msg.success = True
+            # Populate the poses array in the result message
+            result_msg.poses = [pose]
+            
             x, y, z = pose.pose.position.x, pose.pose.position.y, pose.pose.position.z
-            result_msg.message = f"{object_name.capitalize()} detected at [x: {x:.3f}, y: {y:.3f}, z: {z:.3f}] with Radius: {radius:.4f}m"
+            result_msg.message = f"Successfully detected {display_label} at [x: {x:.3f}, y: {y:.3f}, z: {z:.3f}]"
+            
+            if radius is not None:
+                result_msg.message += f" | Radius: {radius:.4f}m"
         else:
-            result_msg.success, result_msg.message = False, f"Timed out waiting for {object_name}."
+            result_msg.success, result_msg.message = False, f"Vision timeout: {display_label} not found."
 
         return result_msg
+
+    async def _set_remote_parameters(self, node_name, param_dict):
+        """Sets parameters on a remote node asynchronously using the SetParameters service."""
+        param_service = f"{node_name}/set_parameters"
+        client = self.create_client(SetParameters, param_service, callback_group=self.group)
+        
+        if not client.wait_for_service(timeout_sec=2.0):
+            self.get_logger().error(f"Parameter service {param_service} not available.")
+            return False
+
+        request = SetParameters.Request()
+        for name, value in param_dict.items():
+            request.parameters.append(Parameter(name=name, value=value))
+        
+        future = client.call_async(request)
+        while not future.done():
+            await asyncio.sleep(0.05)
+        
+        return True
 
     async def handle_subdoor_pose(self, goal_handle):
         feedback_msg, result_msg = RunVision.Feedback(), RunVision.Result()

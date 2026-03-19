@@ -15,7 +15,7 @@ class BrainClient(Node):
         self._action_client = ActionClient(self, RunVision, 'run_perception_pipeline')
         self.get_logger().info("Brain Client initialized. Ready to dispatch tasks.")
 
-    def send_perception_task(self, task_name: str):
+    def send_perception_task(self, task_name: str, object_class: str = ""):
         self.get_logger().info("Waiting for Perception Dispatcher to come online...")
         
         # Check if the server is available
@@ -25,8 +25,9 @@ class BrainClient(Node):
 
         goal_msg = RunVision.Goal()
         goal_msg.task_name = task_name
+        goal_msg.object_class = object_class
         
-        self.get_logger().info(f"Sending goal request for task: '{task_name}'")
+        self.get_logger().info(f"Sending goal request for task: '{task_name}', class='{object_class}'")
         
         # Send the goal and attach callbacks
         self._send_goal_future = self._action_client.send_goal_async(
@@ -93,18 +94,19 @@ def main(args=None):
     ]
     
     # Simple CLI argument check
-    if len(sys.argv) < 2 or sys.argv[1] not in valid_tasks:
-        print("\nUsage: ros2 run perception brain_client <task_name>")
-        print(f"Available tasks: {', '.join(valid_tasks)}\n")
+    if len(sys.argv) < 2:
+        print("Usage: ros2 run perception brain_client <task_name> [object_class]")
         sys.exit(1)
 
     task_name = sys.argv[1]
+    # Get optional class name if provided, else empty string
+    object_class = sys.argv[2] if len(sys.argv) > 2 else ''
 
     rclpy.init(args=args)
     brain_client = BrainClient()
     
     # Start the task
-    brain_client.send_perception_task(task_name)
+    brain_client.send_perception_task(task_name, object_class)
     
     try:
         rclpy.spin(brain_client)

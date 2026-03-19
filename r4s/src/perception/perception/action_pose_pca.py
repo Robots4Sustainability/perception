@@ -22,6 +22,7 @@ class PointCloudCropperLifecycleNode(LifecycleNode):
         self.bridge = CvBridge()
 
         self.declare_parameter('input_mode', 'robot')
+        self.declare_parameter('target_class', '')
 
         self.pc_pub = None
         self.pose_pub = None
@@ -68,6 +69,8 @@ class PointCloudCropperLifecycleNode(LifecycleNode):
             )
             self.ts.registerCallback(self.sync_callback)
 
+            self.target_class = self.get_parameter('target_class').get_parameter_value().string_value
+
             self.get_logger().info("Configuration complete.")
             return TransitionCallbackReturn.SUCCESS
         except Exception as e:
@@ -111,6 +114,8 @@ class PointCloudCropperLifecycleNode(LifecycleNode):
     def sync_callback(self, cloud_msg, detection_msg, image_msg):
         if not self._is_active: return
 
+        target = self.get_parameter('target_class').get_parameter_value().string_value
+
         try:
             color_image = self.bridge.imgmsg_to_cv2(image_msg, desired_encoding='bgr8')
         except Exception as e:
@@ -126,6 +131,11 @@ class PointCloudCropperLifecycleNode(LifecycleNode):
 
         for idx, detection in enumerate(detection_msg.detections):
             detected_class = detection.results[0].hypothesis.class_id
+
+            if target != '' and detected_class != target:
+                self.get_logger().info(f"Ignoring '{detected_class}', searching for '{target}'...")
+                continue
+
             cx, cy = int(detection.bbox.center.position.x), int(detection.bbox.center.position.y)
             w, h = int(detection.bbox.size_x), int(detection.bbox.size_y)
 
@@ -151,9 +161,38 @@ class PointCloudCropperLifecycleNode(LifecycleNode):
 
             if len(cropped_points) >= 3:
                 centroid = np.mean(cropped_points, axis=0)
-                centered = cropped_points - centroid
-                _, _, vh = np.linalg.svd(centered, full_matrices=False)
-                R = vh.T
+                
+                if detected_class in ["motor", "motor_grip"]:
+                    # Fixed rotation: 90 degrees clockwise around Z-axis
+                    # Old Frame: X=Right (Red), Y=Down (Green), Z=Forward (Blue)
+                    # New Frame: X=Down (old +Y), Y=Left (old -X), Z=Forward
+                    R = np.array([
+                        [ 0.0, -1.0,  0.0],
+                        [ 1.0,  0.0,  0.0],
+                        [ 0.0,  0.0,  1.0]
+                    ])
+                    self.get_logger().info(f"Using FIXED 90-deg CW rotation for {detected_class}")
+                
+                elif detected_class == "unit":
+                    # Fixed rotation: 30 degrees clockwise around Z-axis
+                    theta = np.radians(45)
+                    c, s = np.cos(theta), np.sin(theta)
+                    R = np.array([
+                        [ c, -s, 0.0],
+                        [ s,  c, 0.0],
+                        [0.0, 0.0, 1.0]
+                    ])
+                    self.get_logger().info(f"Using FIXED 30-deg rotation for {detected_class}")
+
+                else:
+                    # Standard PCA rotation for all other objects
+                    centered = cropped_points - centroid
+                    _, _, vh = np.linalg.svd(centered, full_matrices=False)
+                    R = vh.T
+                    # Ensure a right-handed coordinate system
+                    if np.linalg.det(R) < 0:
+                        R[:, 2] *= -1
+                    self.get_logger().info(f"Using PCA rotation for {detected_class}")
 
                 T = np.eye(4)
                 T[:3, :3] = R

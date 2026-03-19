@@ -1,5 +1,6 @@
 # --- GOAL ---
 string task_name           # e.g., 'car_objects', 'table_height', 'screwdriver', 'subdoor', 'screws'
+string object_class
 float32 time_duration
 ---
 # --- RESULT ---

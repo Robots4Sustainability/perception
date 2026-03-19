@@ -172,18 +172,20 @@ class BodyPoseEstimatorLifecycleNode(LifecycleNode):
 
         target_contour = self.find_body_contour(results[0])
         if target_contour is not None:
-            four_points_2d = self.get_4_point_approx(target_contour)
-            if four_points_2d is not None:
+            four_points_approx = self.get_4_point_approx(target_contour)
+            if four_points_approx is not None:
+                sorted_points_2d = self.sort_points_clockwise(four_points_approx)
+
                 points_3d = []
-                for pt in four_points_2d:
-                    u, v = pt[0]
+                for pt in sorted_points_2d:
+                    u, v = pt
                     xyz = self.get_xyz_from_cloud(pc_msg, u, v, window=5)
                     if xyz: points_3d.append(xyz)
                 
                 if len(points_3d) == 4:
                     self.latest_poses = points_3d 
                     self.publish_results(points_3d, img_msg.header)
-                    cv2.drawContours(cv_image, [four_points_2d], -1, (0, 255, 0), 2)
+                    cv2.drawContours(cv_image, [sorted_points_2d.reshape(4,1,2)], -1, (0, 255, 0), 2)
                 else:
                     self.get_logger().warn(f"3D extraction failed: {len(points_3d)}/4 points valid")
 
@@ -213,6 +215,24 @@ class BodyPoseEstimatorLifecycleNode(LifecycleNode):
             if len(approx) < 4: return None
             epsilon_factor += 0.005
         return None
+    
+    def sort_points_clockwise(self, pts):
+        # pts is (4, 1, 2) from approxPolyDP, reshape to (4, 2)
+        pts = pts.reshape((4, 2))
+        rect = np.zeros((4, 2), dtype="int32")
+
+        # Top-left has the smallest sum, Bottom-right has the largest sum
+        s = pts.sum(axis=1)
+        rect[0] = pts[np.argmin(s)] # Top-Left
+        rect[2] = pts[np.argmax(s)] # Bottom-Right
+
+        # Top-right has the smallest difference (x - y is large, or y - x is small)
+        # Bottom-left has the largest difference (y - x is large)
+        diff = np.diff(pts, axis=1)
+        rect[1] = pts[np.argmin(diff)] # Top-Right
+        rect[3] = pts[np.argmax(diff)] # Bottom-Left
+
+        return rect
 
     def publish_results(self, points_3d, header):
         pts = np.array(points_3d)
