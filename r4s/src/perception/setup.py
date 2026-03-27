@@ -41,7 +41,8 @@ setup(
             "subdoor = perception.subdoor:main",
 
             #3 Table Height
-            "table_height = perception.table_height_node:main",
+            'table_height = perception.table_height_ransac:main',
+
 
             #4 Place Object
             "table_segmentation_node = perception.table_segmentation:main",
