@@ -23,6 +23,23 @@ class PerceptionDispatcher(Node):
         super().__init__('perception_pipeline_node')
         self.group = ReentrantCallbackGroup()
 
+        # ==========================================
+        # LAZY LOADING PARAMETER
+        # ==========================================
+        # lazy_loading = False (default): Pre-configure all nodes at startup.
+        #   Models are loaded into VRAM once and stay there.
+        #   Tasks only toggle activate/deactivate. Fast task execution.
+        #
+        # lazy_loading = True: No pre-configuration at startup.
+        #   Each task does a full configure->activate cycle on demand,
+        #   then deactivate->cleanup when done. Models are fully unloaded
+        #   from VRAM between tasks. Slower per-task but saves VRAM.
+        self.declare_parameter('lazy_loading', False)
+        self._lazy = self.get_parameter('lazy_loading').get_parameter_value().bool_value
+        self.get_logger().info(
+            f"Lazy loading mode: {'ENABLED (low VRAM)' if self._lazy else 'DISABLED (pre-load all)'}"
+        )
+
         # Action Server setup
         self._action_server = ActionServer(
             self,
@@ -56,10 +73,10 @@ class PerceptionDispatcher(Node):
 
         # Place Object (Table Segmentation)
         self.place_object_client = self.create_client(ChangeState, '/place_object_node/change_state', callback_group=self.group)
+
         # ==========================================
         # 2. PERSISTENT STATE STORAGE
         # ==========================================
-        # This dictionary stores the latest data for every task safely
         self.vision_data = {
             'screw': {'pose': None, 'radius': None},
             'car object': {'pose': None, 'radius': None},
@@ -81,8 +98,6 @@ class PerceptionDispatcher(Node):
         self.create_subscription(MarkerArray, '/body_markers', self.subdoor_cb, 10, callback_group=self.group)
         self.create_subscription(PoseStamped, '/object_pose_screwdriver', self.screwdriver_cb, 10, callback_group=self.group)
         self.create_subscription(PoseStamped, '/perception/table_pose', self.table_pose_cb, 10, callback_group=self.group)
-        
-        # NEW: Listen to the placement pose calculated by the table segmentation node
         self.create_subscription(PoseStamped, '/perception/target_place_pose', self.place_pose_cb, 10, callback_group=self.group)
 
         self.get_logger().info("Perception Dispatcher initializing...")
@@ -111,19 +126,26 @@ class PerceptionDispatcher(Node):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            # Use a variable to track overall success
-            all_successful = loop.run_until_complete(self._startup_all())
-            
-            if all_successful:
+            if self._lazy:
+                # In lazy mode: nodes stay unconfigured. Nothing to do at startup.
                 self.get_logger().info("======================================================")
-                self.get_logger().info("Startup routine completed. ALL nodes pre-configured.")
+                self.get_logger().info("LAZY MODE: Skipping startup pre-configuration.")
+                self.get_logger().info("Models will be loaded on demand per task.")
                 self.get_logger().info("Perception Dispatcher is READY for tasks.")
                 self.get_logger().info("======================================================")
             else:
-                self.get_logger().error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-                self.get_logger().error("STARTUP PARTIALLY FAILED. Some nodes did not configure.")
-                self.get_logger().error("Check the logs above for specific node failures.")
-                self.get_logger().error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+                # In eager mode: configure all nodes upfront so tasks only toggle activation.
+                all_successful = loop.run_until_complete(self._startup_all())
+                if all_successful:
+                    self.get_logger().info("======================================================")
+                    self.get_logger().info("Startup routine completed. ALL nodes pre-configured.")
+                    self.get_logger().info("Perception Dispatcher is READY for tasks.")
+                    self.get_logger().info("======================================================")
+                else:
+                    self.get_logger().error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+                    self.get_logger().error("STARTUP PARTIALLY FAILED. Some nodes did not configure.")
+                    self.get_logger().error("Check the logs above for specific node failures.")
+                    self.get_logger().error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         finally:
             loop.close()
 
@@ -165,6 +187,35 @@ class PerceptionDispatcher(Node):
         result = future.result()
         return result.success if result is not None else False
 
+    # ==========================================
+    # LIFECYCLE HELPERS — LAZY vs EAGER
+    # ==========================================
+
+    async def _node_start(self, client, node_name: str) -> bool:
+        """Bring a node to Active state.
+        
+        Eager mode: node is already Configured, just activate it.
+        Lazy mode:  node is Unconfigured, so configure it first (loads model
+                    into VRAM), then activate it.
+        """
+        if self._lazy:
+            self.get_logger().info(f"[LAZY] Configuring (loading) {node_name}...")
+            if not await self._change_lifecycle_state(client, Transition.TRANSITION_CONFIGURE):
+                self.get_logger().error(f"Failed to configure {node_name}.")
+                return False
+        return await self._change_lifecycle_state(client, Transition.TRANSITION_ACTIVATE)
+
+    async def _node_stop(self, client, node_name: str):
+        """Bring a node back to its resting state.
+        
+        Eager mode: deactivate only — model stays in VRAM, ready for next task.
+        Lazy mode:  deactivate then cleanup — model is fully unloaded from VRAM.
+        """
+        await self._change_lifecycle_state(client, Transition.TRANSITION_DEACTIVATE)
+        if self._lazy:
+            self.get_logger().info(f"[LAZY] Cleaning up (unloading) {node_name}...")
+            await self._change_lifecycle_state(client, Transition.TRANSITION_CLEANUP)
+
     # --- ACTION SERVER CALLBACKS ---
     def goal_callback(self, goal_request):
         self.get_logger().info(f"Received request for task: {goal_request.task_name}")
@@ -188,10 +239,8 @@ class PerceptionDispatcher(Node):
             if task == 'table_height':
                 result = loop.run_until_complete(self.handle_table_height(goal_handle))
             elif task == 'detect_screws':
-                # Pass the screw clients to the generic YOLO handler
                 result = loop.run_until_complete(self.handle_detect_yolo(goal_handle, self.yolo_screw_client, self.cropper_screw_client, "screw"))
             elif task == 'car_objects':
-                # Pass the car clients to the generic YOLO handler
                 result = loop.run_until_complete(self.handle_detect_yolo(goal_handle, self.yolo_car_client, self.cropper_car_client, "car object"))
             elif task == 'subdoor_pose':
                 result = loop.run_until_complete(self.handle_subdoor_pose(goal_handle))
@@ -222,21 +271,20 @@ class PerceptionDispatcher(Node):
     
     async def handle_table_height(self, goal_handle):
         feedback_msg, result_msg = RunVision.Feedback(), RunVision.Result()
-        self.vision_data['table_pose'] = None # Clear old data
+        self.vision_data['table_pose'] = None
 
         feedback_msg.current_phase = "Activating Table Estimator..."
         goal_handle.publish_feedback(feedback_msg)
-        await self._change_lifecycle_state(self.table_lifecycle_client, Transition.TRANSITION_ACTIVATE)
+        await self._node_start(self.table_lifecycle_client, 'Table Height Node')
 
         feedback_msg.current_phase = "Waiting for table pose..."
         goal_handle.publish_feedback(feedback_msg)
 
-        # Wait for the pose
         for _ in range(150):
             if self.vision_data['table_pose'] is not None: break
             await asyncio.sleep(0.1)
 
-        await self._change_lifecycle_state(self.table_lifecycle_client, Transition.TRANSITION_DEACTIVATE)
+        await self._node_stop(self.table_lifecycle_client, 'Table Height Node')
 
         pose = self.vision_data['table_pose']
         if pose is not None:
@@ -251,29 +299,32 @@ class PerceptionDispatcher(Node):
     async def handle_detect_yolo(self, goal_handle, yolo_client, cropper_client, object_name):
         feedback_msg, result_msg = RunVision.Feedback(), RunVision.Result()
 
-        # 1. Capture the requested class from the Action Goal
         requested_class = goal_handle.request.object_class
         
-        # Clear old data for this specific pipeline to prevent stale results
         self.vision_data[object_name]['pose'] = None
         self.vision_data[object_name]['radius'] = None
 
+        if requested_class=='unit' or requested_class=="speaker":
+            model_type='unit'
+        else:
+            model_type='fine_tuned'
+
         # --- DYNAMIC PARAMETER OVERRIDE ---
-        # We set parameters on both nodes BEFORE activation to ensure 
-        # the very first frame processed is correct.
+        # In lazy mode, parameters must be set while the node is still in the
+        # Configured (inactive) state — i.e. AFTER configure but BEFORE activate.
+        # We therefore call _set_remote_parameters before _node_start here.
+        # In eager mode nodes are already configured, so this works identically.
         if requested_class:
             self.get_logger().info(f"Targeting specific class for {object_name}: '{requested_class}'")
             
-            # Target YOLO Node: Update 'class_names' (STRING_ARRAY)
             yolo_ns = yolo_client.srv_name.replace('/change_state', '')
             await self._set_remote_parameters(yolo_ns, {
-                'class_names': ParameterValue(
-                    type=ParameterType.PARAMETER_STRING_ARRAY, 
-                    string_array_value=[requested_class]
+                'model_type': ParameterValue(
+                    type=ParameterType.PARAMETER_STRING, 
+                    string_value=model_type,
                 )
             })
 
-            # Target Cropper Node: Update 'target_class' (STRING)
             cropper_ns = cropper_client.srv_name.replace('/change_state', '')
             await self._set_remote_parameters(cropper_ns, {
                 'target_class': ParameterValue(
@@ -282,8 +333,6 @@ class PerceptionDispatcher(Node):
                 )
             })
         else:
-            # If no class requested, reset Cropper to empty string 
-            # to allow "First-Come-First-Served" logic.
             cropper_ns = cropper_client.srv_name.replace('/change_state', '')
             await self._set_remote_parameters(cropper_ns, {
                 'target_class': ParameterValue(
@@ -296,9 +345,8 @@ class PerceptionDispatcher(Node):
         feedback_msg.current_phase = f"Activating Pipeline ({object_name})..."
         goal_handle.publish_feedback(feedback_msg)
 
-        # Activate both nodes
-        yolo_success = await self._change_lifecycle_state(yolo_client, Transition.TRANSITION_ACTIVATE)
-        cropper_success = await self._change_lifecycle_state(cropper_client, Transition.TRANSITION_ACTIVATE)
+        yolo_success = await self._node_start(yolo_client, f'YOLO {object_name}')
+        cropper_success = await self._node_start(cropper_client, f'Cropper {object_name}')
 
         if not (yolo_success and cropper_success):
             result_msg.success, result_msg.message = False, f"Failed to activate {object_name} pipeline."
@@ -309,18 +357,17 @@ class PerceptionDispatcher(Node):
         feedback_msg.current_phase = f"Waiting for {display_label} detection..."
         goal_handle.publish_feedback(feedback_msg)
 
-        # Wait loop (up to 15 seconds)
         for _ in range(150):
             if self.vision_data[object_name]['pose'] is not None:
                 break
             await asyncio.sleep(0.1)
 
-        # --- DEACTIVATION ---
+        # --- DEACTIVATION / CLEANUP ---
         feedback_msg.current_phase = f"Deactivating Pipeline ({object_name})..."
         goal_handle.publish_feedback(feedback_msg)
         
-        await self._change_lifecycle_state(cropper_client, Transition.TRANSITION_DEACTIVATE)
-        await self._change_lifecycle_state(yolo_client, Transition.TRANSITION_DEACTIVATE)
+        await self._node_stop(cropper_client, f'Cropper {object_name}')
+        await self._node_stop(yolo_client, f'YOLO {object_name}')
 
         # --- RESULT PACKAGING ---
         pose = self.vision_data[object_name]['pose']
@@ -328,12 +375,9 @@ class PerceptionDispatcher(Node):
 
         if pose is not None:
             result_msg.success = True
-            # Populate the poses array in the result message
             result_msg.poses = [pose]
-            
             x, y, z = pose.pose.position.x, pose.pose.position.y, pose.pose.position.z
             result_msg.message = f"Successfully detected {display_label} at [x: {x:.3f}, y: {y:.3f}, z: {z:.3f}]"
-            
             if radius is not None:
                 result_msg.message += f" | Radius: {radius:.4f}m"
         else:
@@ -366,7 +410,7 @@ class PerceptionDispatcher(Node):
 
         feedback_msg.current_phase = "Activating Subdoor Node..."
         goal_handle.publish_feedback(feedback_msg)
-        if not await self._change_lifecycle_state(self.subdoor_lifecycle_client, Transition.TRANSITION_ACTIVATE):
+        if not await self._node_start(self.subdoor_lifecycle_client, 'Subdoor Pose Node'):
             result_msg.success, result_msg.message = False, "Failed to activate subdoor."
             return result_msg 
 
@@ -379,7 +423,7 @@ class PerceptionDispatcher(Node):
 
         feedback_msg.current_phase = "Deactivating Subdoor Node..."
         goal_handle.publish_feedback(feedback_msg)
-        await self._change_lifecycle_state(self.subdoor_lifecycle_client, Transition.TRANSITION_DEACTIVATE)
+        await self._node_stop(self.subdoor_lifecycle_client, 'Subdoor Pose Node')
 
         markers = self.vision_data['subdoor']
         if markers is not None:
@@ -401,8 +445,8 @@ class PerceptionDispatcher(Node):
         feedback_msg.current_phase = "Activating OBB Pipeline..."
         goal_handle.publish_feedback(feedback_msg)
 
-        obb_success = await self._change_lifecycle_state(self.obb_object_lifecycle_client, Transition.TRANSITION_ACTIVATE)
-        cropper_success = await self._change_lifecycle_state(self.obb_cropper_lifecycle_client, Transition.TRANSITION_ACTIVATE)
+        obb_success = await self._node_start(self.obb_object_lifecycle_client, 'OBB Detector Node')
+        cropper_success = await self._node_start(self.obb_cropper_lifecycle_client, 'OBB Cropper Node')
 
         if not (obb_success and cropper_success):
             result_msg.success, result_msg.message = False, "Failed to activate OBB nodes."
@@ -418,8 +462,8 @@ class PerceptionDispatcher(Node):
         feedback_msg.current_phase = "Deactivating OBB Pipeline..."
         goal_handle.publish_feedback(feedback_msg)
         
-        await self._change_lifecycle_state(self.obb_cropper_lifecycle_client, Transition.TRANSITION_DEACTIVATE)
-        await self._change_lifecycle_state(self.obb_object_lifecycle_client, Transition.TRANSITION_DEACTIVATE)
+        await self._node_stop(self.obb_cropper_lifecycle_client, 'OBB Cropper Node')
+        await self._node_stop(self.obb_object_lifecycle_client, 'OBB Detector Node')
 
         pose = self.vision_data['screwdriver']
         if pose is not None:
@@ -434,59 +478,60 @@ class PerceptionDispatcher(Node):
         return result_msg
 
     async def handle_place_object(self, goal_handle):
-            feedback_msg, result_msg = RunVision.Feedback(), RunVision.Result()
-            self.vision_data['place_pose'] = None
+        feedback_msg, result_msg = RunVision.Feedback(), RunVision.Result()
+        self.vision_data['place_pose'] = None
 
-            feedback_msg.current_phase = "Activating Table Segmentation (Place) Node..."
-            goal_handle.publish_feedback(feedback_msg)
-            
-            if not await self._change_lifecycle_state(self.place_object_client, Transition.TRANSITION_ACTIVATE):
-                result_msg.success, result_msg.message = False, "Failed to activate Place Object node."
-                return result_msg 
+        feedback_msg.current_phase = "Activating Table Segmentation (Place) Node..."
+        goal_handle.publish_feedback(feedback_msg)
+        
+        if not await self._node_start(self.place_object_client, 'Place Object Node'):
+            result_msg.success, result_msg.message = False, "Failed to activate Place Object node."
+            return result_msg 
 
-            feedback_msg.current_phase = "Scanning table for safe dropping zone..."
-            goal_handle.publish_feedback(feedback_msg)
+        feedback_msg.current_phase = "Scanning table for safe dropping zone..."
+        goal_handle.publish_feedback(feedback_msg)
 
-            # Wait up to 15 seconds for an empty spot to be found
-            for _ in range(150):
-                if self.vision_data['place_pose'] is not None: break
-                await asyncio.sleep(0.1)
+        for _ in range(150):
+            if self.vision_data['place_pose'] is not None: break
+            await asyncio.sleep(0.1)
 
-            feedback_msg.current_phase = "Deactivating Place Object Node..."
-            goal_handle.publish_feedback(feedback_msg)
-            await self._change_lifecycle_state(self.place_object_client, Transition.TRANSITION_DEACTIVATE)
+        feedback_msg.current_phase = "Deactivating Place Object Node..."
+        goal_handle.publish_feedback(feedback_msg)
+        await self._node_stop(self.place_object_client, 'Place Object Node')
 
-            pose = self.vision_data['place_pose']
-            if pose is not None:
-                result_msg.success = True
-                x, y, z = pose.pose.position.x, pose.pose.position.y, pose.pose.position.z
-                qx, qy, qz, qw = pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z, pose.pose.orientation.w
-                result_msg.message = (f"Safe Placement Pose found at [x: {x:.3f}, y: {y:.3f}, z: {z:.3f}]\n"
-                                    f"Orientation: [qx: {qx:.3f}, qy: {qy:.3f}, qz: {qz:.3f}, qw: {qw:.3f}]")
-            else:
-                result_msg.success, result_msg.message = False, "Timed out waiting for an empty spot on the table."
+        pose = self.vision_data['place_pose']
+        if pose is not None:
+            result_msg.success = True
+            x, y, z = pose.pose.position.x, pose.pose.position.y, pose.pose.position.z
+            qx, qy, qz, qw = pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z, pose.pose.orientation.w
+            result_msg.message = (f"Safe Placement Pose found at [x: {x:.3f}, y: {y:.3f}, z: {z:.3f}]\n"
+                                f"Orientation: [qx: {qx:.3f}, qy: {qy:.3f}, qz: {qz:.3f}, qw: {qw:.3f}]")
+        else:
+            result_msg.success, result_msg.message = False, "Timed out waiting for an empty spot on the table."
 
-            return result_msg
+        return result_msg
 
     # --- SHUTDOWN ROUTINES ---
     def sync_shutdown_routine(self):
         self.get_logger().info('Initiating graceful shutdown of all pipeline nodes...')
         managed_nodes = [
-            ('YOLO Screw Node',          self.yolo_screw_client),
-            ('YOLO Car Node',            self.yolo_car_client),
-            ('Cropper Screw Node',       self.cropper_screw_client),
-            ('Cropper Car Node',         self.cropper_car_client),
-            ('Table Height Node',        self.table_lifecycle_client),
-            ('Subdoor Pose Node',       self.subdoor_lifecycle_client),
-            ('OBB Detector Node',       self.obb_object_lifecycle_client),
-            ('OBB Cropper Node',        self.obb_cropper_lifecycle_client),
-            ('Place Object Node',        self.place_object_client),
-            
+            ('YOLO Screw Node',    self.yolo_screw_client),
+            ('YOLO Car Node',      self.yolo_car_client),
+            ('Cropper Screw Node', self.cropper_screw_client),
+            ('Cropper Car Node',   self.cropper_car_client),
+            ('Table Height Node',  self.table_lifecycle_client),
+            ('Subdoor Pose Node',  self.subdoor_lifecycle_client),
+            ('OBB Detector Node',  self.obb_object_lifecycle_client),
+            ('OBB Cropper Node',   self.obb_cropper_lifecycle_client),
+            ('Place Object Node',  self.place_object_client),
         ]
 
         for name, client in managed_nodes:
-            self.get_logger().info(f'  Cleaning up {name}...')
-            self._sync_change_state(client, Transition.TRANSITION_CLEANUP)
+            if not self._lazy:
+                # Eager mode: nodes are in Configured state at rest, need cleanup first
+                self.get_logger().info(f'  Cleaning up {name}...')
+                self._sync_change_state(client, Transition.TRANSITION_CLEANUP)
+            # In lazy mode: nodes are already Unconfigured at rest, skip cleanup
             self.get_logger().info(f'  Shutting down {name}...')
             self._sync_change_state(client, Transition.TRANSITION_UNCONFIGURED_SHUTDOWN)
 

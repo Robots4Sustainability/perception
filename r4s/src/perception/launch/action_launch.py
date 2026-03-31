@@ -12,16 +12,16 @@ def generate_launch_description():
         description="Camera input mode: 'robot' or 'realsense'"
     )
 
+    lazy_loading_arg = DeclareLaunchArgument(
+        'lazy_loading',
+        default_value='false',
+        description="If true, models are loaded/unloaded per task to save VRAM. Slower per task."
+    )
+
     input_mode = LaunchConfiguration('input_mode')
+    lazy_loading = LaunchConfiguration('lazy_loading')
     pkg_name = 'perception'
 
-
-    vram_saver_arg = DeclareLaunchArgument(
-        'vram_saver',
-        default_value='true',
-        description="If true, loads models on activate to save VRAM."
-    )
-    vram_saver = LaunchConfiguration('vram_saver')
 
     # --- 2. Lifecycle Nodes ---
 
@@ -69,7 +69,11 @@ def generate_launch_description():
         executable='action_yolo_node',   
         name='yolo_screw_node',
         namespace='',
-        parameters=[{'model_type': 'screw', 'input_mode': input_mode}],
+        parameters=[{
+            'model_type': 'screw',
+            'input_mode': input_mode,
+            'conf_threshold': 0.3
+            }],
         remappings=[
             ('/yolo/detections', '/screw/detections') 
         ]
@@ -99,7 +103,6 @@ def generate_launch_description():
         parameters=[{
             'model_type': 'fine_tuned', 
             'input_mode': input_mode,
-            'load_on_activate': vram_saver
                      }],
         remappings=[
             ('/yolo/detections', '/car/detections') 
@@ -148,7 +151,8 @@ def generate_launch_description():
         package=pkg_name,
         executable='vision_manager_node',  
         name='perception_pipeline_node',
-        output='screen'
+        output='screen',
+        parameters=[{'lazy_loading': lazy_loading}]
     )
 
     # --- 4. Build Launch Description ---

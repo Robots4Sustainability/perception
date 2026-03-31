@@ -15,7 +15,7 @@ class BrainClient(Node):
         self._action_client = ActionClient(self, RunVision, 'run_perception_pipeline')
         self.get_logger().info("Brain Client initialized. Ready to dispatch tasks.")
 
-    def send_perception_task(self, task_name: str, object_class: str = ""):
+    def send_perception_task(self, task_name: str, object_class: str = "", radius: float = 0.0):
         self.get_logger().info("Waiting for Perception Dispatcher to come online...")
         
         # Check if the server is available
@@ -26,6 +26,7 @@ class BrainClient(Node):
         goal_msg = RunVision.Goal()
         goal_msg.task_name = task_name
         goal_msg.object_class = object_class
+        goal_msg.radius = radius
         
         self.get_logger().info(f"Sending goal request for task: '{task_name}', class='{object_class}'")
         
@@ -42,39 +43,50 @@ class BrainClient(Node):
         self.get_logger().info(f"Dispatcher Feedback: [{feedback.current_phase}]")
 
     def goal_response_callback(self, future):
-        """Handles whether the Dispatcher accepted or rejected the task."""
-        goal_handle = future.result()
-        
-        if not goal_handle.accepted:
-            self.get_logger().error('Task was REJECTED by the Perception Dispatcher.')
-            self._shutdown_client()
-            return
+        try:
+            # 1. STORE THE HANDLE IN SELF
+            self._goal_handle = future.result() 
 
-        self.get_logger().info('Task accepted! Waiting for pipeline execution to finish...')
-        self._get_result_future = goal_handle.get_result_async()
-        self._get_result_future.add_done_callback(self.get_result_callback)
+            if not self._goal_handle.accepted:
+                self.get_logger().error('Goal rejected')
+                return
+
+            self.get_logger().info('Goal accepted!')
+
+            # 2. ADD A LOG HERE TO SEE IF WE EVEN GET THIS FAR
+            self.get_logger().info('Requesting result...')
+            
+            self._get_result_future = self._goal_handle.get_result_async()
+            self._get_result_future.add_done_callback(self.get_result_callback)
+
+        except Exception as e:
+            self.get_logger().error(f"Logic Error in Response Callback: {e}")
 
     def get_result_callback(self, future):
-        """Processes the final outcome of the vision task."""
-        status = future.result().status
-        result = future.result().result
-        
-        if status == GoalStatus.STATUS_SUCCEEDED:
-            if result.success:
+        try:
+            action_result = future.result()
+            status = action_result.status
+            result = action_result.result # This is the RunVision.Result object
+            
+            if status == 4: # 4 is STATUS_SUCCEEDED
                 self.get_logger().info("--------------------------------------------------")
                 self.get_logger().info("✅ VISION TASK SUCCESSFUL")
-                self.get_logger().info(f"RESULT: {result.message}")
-                self.get_logger().info("--------------------------------------------------")
+                # This prints the X, Y, Z string from the Dispatcher
+                self.get_logger().info(f"DATA: {result.message}") 
                 
-                # If this was a placement task, you can access the pose directly if 
-                # your action definition includes a pose/poses field.
-                # Example: if result.poses: ...
+                # If you need to access the raw numbers for robot movement:
+                if result.poses:
+                    p = result.poses[0].pose.position
+                    self.get_logger().info(f"Raw Coordinates: x={p.x:.3f}, y={p.y:.3f}, z={p.z:.3f}")
+                self.get_logger().info("--------------------------------------------------")
             else:
-                self.get_logger().error(f"❌ Vision Task Failed: {result.message}")
-        else:
-            self.get_logger().error(f"🚨 Action Server Error. Status Code: {status}")
+                self.get_logger().error(f"Task ended with status code: {status}")
+                
+        except Exception as e:
+            self.get_logger().error(f"Error printing result: {e}")
+        finally:
+            self._shutdown_client()
 
-        self._shutdown_client()
 
     def _shutdown_client(self):
         """Cleanly shuts down the node after task completion."""
@@ -101,12 +113,13 @@ def main(args=None):
     task_name = sys.argv[1]
     # Get optional class name if provided, else empty string
     object_class = sys.argv[2] if len(sys.argv) > 2 else ''
+    radius = float(sys.argv[3]) if len(sys.argv) > 3 else 0.0
 
     rclpy.init(args=args)
     brain_client = BrainClient()
     
     # Start the task
-    brain_client.send_perception_task(task_name, object_class)
+    brain_client.send_perception_task(task_name, object_class, radius)
     
     try:
         rclpy.spin(brain_client)

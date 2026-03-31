@@ -63,6 +63,7 @@ class YoloDetectorLifecycleNode(LifecycleNode):
                 package_share_directory = get_package_share_directory(self.package_name)
                 model_map = {
                     'fine_tuned': 'fine_tuned.pt',
+                    'unit':'fine_tuned_old.pt',
                     'screw':      'screw_best.pt',
                     'default':    'yolov8n.pt'
                 }

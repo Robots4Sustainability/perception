@@ -52,7 +52,7 @@ class YoloDetectorNode(Node):
             
             if model_type == 'fine_tuned':
                 # Construct the path to the model relative to the share directory
-                model_path = os.path.join(package_share_directory, 'models', 'fine_tuned.pt')
+                model_path = os.path.join(package_share_directory, 'models', 'fine_tuned_old.pt')
             else:
                 model_path = os.path.join(package_share_directory, 'models', 'yolov8n.pt')
 

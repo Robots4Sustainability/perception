@@ -10,6 +10,8 @@ import numpy as np
 import struct
 
 from rclpy.signals import SignalHandlerOptions
+from rcl_interfaces.msg import SetParametersResult
+from rclpy.parameter import Parameter
 
 class TableSegmentationNode(LifecycleNode):
     def __init__(self):
@@ -53,6 +55,14 @@ class TableSegmentationNode(LifecycleNode):
 
         self._is_active = False
         self.get_logger().info("Table Segmentation Lifecycle Node Initialized (Unconfigured).")
+        self.add_on_set_parameters_callback(self.parameter_callback)
+
+    def parameter_callback(self, params):
+        for param in params:
+            if param.name == 'test_radius' and param.type_ == Parameter.Type.DOUBLE:
+                self.current_radius = param.value
+                self.get_logger().info(f"Param Update: current_radius set to {self.current_radius:.3f}m")
+        return SetParametersResult(successful=True)
 
     # --- LIFECYCLE CALLBACKS ---
 

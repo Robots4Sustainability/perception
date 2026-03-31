@@ -163,26 +163,27 @@ class PointCloudCropperLifecycleNode(LifecycleNode):
                 centroid = np.mean(cropped_points, axis=0)
                 
                 if detected_class in ["motor", "motor_grip"]:
-                    # Fixed rotation: 90 degrees clockwise around Z-axis
+                    # Fixed rotation: 90 degrees around Z-axis
                     # Old Frame: X=Right (Red), Y=Down (Green), Z=Forward (Blue)
                     # New Frame: X=Down (old +Y), Y=Left (old -X), Z=Forward
                     R = np.array([
-                        [ 0.0, -1.0,  0.0],
-                        [ 1.0,  0.0,  0.0],
+                        [ 0.0, 1.0,  0.0],
+                        [ -1.0,  0.0,  0.0],
                         [ 0.0,  0.0,  1.0]
                     ])
                     self.get_logger().info(f"Using FIXED 90-deg CW rotation for {detected_class}")
                 
                 elif detected_class == "unit":
-                    # Fixed rotation: 30 degrees clockwise around Z-axis
-                    theta = np.radians(45)
+                    # Fixed rotation: degrees clockwise around Z-axis
+                    deg = 170
+                    theta = np.radians(deg)
                     c, s = np.cos(theta), np.sin(theta)
                     R = np.array([
                         [ c, -s, 0.0],
                         [ s,  c, 0.0],
                         [0.0, 0.0, 1.0]
                     ])
-                    self.get_logger().info(f"Using FIXED 30-deg rotation for {detected_class}")
+                    self.get_logger().info(f"Using FIXED {deg}-deg rotation for {detected_class}")
 
                 else:
                     # Standard PCA rotation for all other objects
@@ -200,13 +201,15 @@ class PointCloudCropperLifecycleNode(LifecycleNode):
                 quat_wxyz = mat2quat(T[:3, :3])
                 quat = [quat_wxyz[1], quat_wxyz[2], quat_wxyz[3], quat_wxyz[0]]
 
+                z_offset = 0.005
+
                 # Pose Publish
                 pose_msg = PoseStamped()
                 pose_msg.header.stamp = self.get_clock().now().to_msg()
                 pose_msg.header.frame_id = cloud_msg.header.frame_id
                 pose_msg.pose.position.x = float(centroid[0])
                 pose_msg.pose.position.y = float(centroid[1])
-                pose_msg.pose.position.z = float(centroid[2])
+                pose_msg.pose.position.z = float(centroid[2]) + z_offset
                 pose_msg.pose.orientation.x = float(quat[0])
                 pose_msg.pose.orientation.y = float(quat[1])
                 pose_msg.pose.orientation.z = float(quat[2])
@@ -220,7 +223,7 @@ class PointCloudCropperLifecycleNode(LifecycleNode):
                 t.child_frame_id = f'object_frame_{idx}'
                 t.transform.translation.x = float(centroid[0])
                 t.transform.translation.y = float(centroid[1])
-                t.transform.translation.z = float(centroid[2])
+                t.transform.translation.z = float(centroid[2]) + z_offset
                 t.transform.rotation.x = float(quat[0])
                 t.transform.rotation.y = float(quat[1])
                 t.transform.rotation.z = float(quat[2])
