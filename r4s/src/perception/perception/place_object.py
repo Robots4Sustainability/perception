@@ -13,9 +13,9 @@ from rclpy.signals import SignalHandlerOptions
 from rcl_interfaces.msg import SetParametersResult
 from rclpy.parameter import Parameter
 
-class TableSegmentationNode(LifecycleNode):
+class PlaceObjectNode(LifecycleNode):
     def __init__(self):
-        super().__init__('table_segmentation_node')
+        super().__init__('place_object_node')
 
         # --- CONFIGURATION (Set in Unconfigured State) ---
         self.declare_parameter('input_mode', 'robot')
@@ -460,7 +460,7 @@ class TableSegmentationNode(LifecycleNode):
 
 def main(args=None):
     rclpy.init(args=args, signal_handler_options=SignalHandlerOptions.NO)
-    node = TableSegmentationNode()
+    node = PlaceObjectNode()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

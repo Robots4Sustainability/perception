@@ -54,7 +54,7 @@ def generate_launch_description():
 
     place_object_node = LifecycleNode(
         package=pkg_name,
-        executable='table_segmentation_node',  
+        executable='place_object_node',  
         name='place_object_node',
         namespace='',
         output='screen',

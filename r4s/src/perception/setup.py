@@ -44,11 +44,14 @@ setup(
             'table_height = perception.table_height_ransac:main',
 
             #4 Place Object
-            "table_segmentation_node = perception.table_segmentation:main",
+            "place_object_node = perception.place_object:main",
 
             #5 Screwdriver
             "obb_node = perception.action_obb_object_detection:main",
             "pose_obb_node = perception.action_obb_pose:main",
+
+
+            ##Other
             # "obb_node = perception.obb_object_detection:main",
             # "pose_obb_node = perception.obb_pose_pca:main",
 

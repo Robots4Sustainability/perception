@@ -304,10 +304,10 @@ class PerceptionDispatcher(Node):
         self.vision_data[object_name]['pose'] = None
         self.vision_data[object_name]['radius'] = None
 
-        if requested_class=='unit' or requested_class=="speaker":
-            model_type='unit'
-        else:
+        if requested_class=='motor' or requested_class=="motor_grip":
             model_type='fine_tuned'
+        else:
+            model_type='unit'
 
         # --- DYNAMIC PARAMETER OVERRIDE ---
         # In lazy mode, parameters must be set while the node is still in the
