@@ -58,7 +58,7 @@ def generate_launch_description():
         name='place_object_node',
         namespace='',
         output='screen',
-        parameters=[{'mode': 'test', 'input_mode': input_mode}]
+        parameters=[{'mode': 'actual', 'input_mode': input_mode}]
     )
 
     # ==========================================

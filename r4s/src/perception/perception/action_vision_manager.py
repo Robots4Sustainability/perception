@@ -481,12 +481,25 @@ class PerceptionDispatcher(Node):
         feedback_msg, result_msg = RunVision.Feedback(), RunVision.Result()
         self.vision_data['place_pose'] = None
 
+        # --- DYNAMIC PARAMETER OVERRIDE (radius) ---
+        radius = goal_handle.request.radius
+        if radius > 0.0:
+            self.get_logger().info(f"Setting place_object radius to: {radius:.4f}m")
+            await self._set_remote_parameters('/place_object_node', {
+                'test_radius': ParameterValue(
+                    type=ParameterType.PARAMETER_DOUBLE,
+                    double_value=float(radius)
+                )
+            })
+        else:
+            self.get_logger().info("No radius provided, using default test_radius on place_object_node.")
+
         feedback_msg.current_phase = "Activating Table Segmentation (Place) Node..."
         goal_handle.publish_feedback(feedback_msg)
-        
+
         if not await self._node_start(self.place_object_client, 'Place Object Node'):
             result_msg.success, result_msg.message = False, "Failed to activate Place Object node."
-            return result_msg 
+            return result_msg
 
         feedback_msg.current_phase = "Scanning table for safe dropping zone..."
         goal_handle.publish_feedback(feedback_msg)
@@ -506,6 +519,8 @@ class PerceptionDispatcher(Node):
             qx, qy, qz, qw = pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z, pose.pose.orientation.w
             result_msg.message = (f"Safe Placement Pose found at [x: {x:.3f}, y: {y:.3f}, z: {z:.3f}]\n"
                                 f"Orientation: [qx: {qx:.3f}, qy: {qy:.3f}, qz: {qz:.3f}, qw: {qw:.3f}]")
+            if radius > 0.0:
+                result_msg.message += f"\nRadius used: {radius:.4f}m"
         else:
             result_msg.success, result_msg.message = False, "Timed out waiting for an empty spot on the table."
 
