@@ -185,6 +185,17 @@ class PointCloudCropperLifecycleNode(LifecycleNode):
                     ])
                     self.get_logger().info(f"Using FIXED {deg}-deg rotation for {detected_class}")
 
+                elif detected_class == 'speaker':
+                    deg = 180
+                    theta = np.radians(deg)
+                    c, s = np.cos(theta), np.sin(theta)
+                    R = np.array([
+                        [ c, -s, 0.0],
+                        [ s,  c, 0.0],
+                        [0.0, 0.0, 1.0]
+                    ])
+                    self.get_logger().info(f"Using FIXED {deg}-deg rotation for {detected_class}")
+
                 else:
                     # Standard PCA rotation for all other objects
                     centered = cropped_points - centroid
