@@ -1,0 +1,5 @@
+setuptools
+open3d
+scikit-learn
+numpy
+opencv-python

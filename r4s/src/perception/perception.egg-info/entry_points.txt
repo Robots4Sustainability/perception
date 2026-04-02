@@ -1,0 +1,13 @@
+[console_scripts]
+action_pose_node = perception.action_pose_pca:main
+action_yolo_node = perception.action_yolo_object_detection:main
+brain_client = perception.brain_client:main
+obb_node = perception.action_obb_object_detection:main
+pose_node = perception.yolo_pose:main
+pose_obb_node = perception.action_obb_pose:main
+subdoor = perception.subdoor:main
+subdoor_node = perception.subdoor_pose_estimator:main
+table_height = perception.table_height_node:main
+table_segmentation_node = perception.table_segmentation:main
+vision_manager_node = perception.action_vision_manager:main
+yolo_node = perception.yolo_object_detection:main
