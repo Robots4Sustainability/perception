@@ -516,6 +516,7 @@ class PerceptionDispatcher(Node):
         pose = self.vision_data['place_pose']
         if pose is not None:
             result_msg.success = True
+            result_msg.poses = [pose]
             x, y, z = pose.pose.position.x, pose.pose.position.y, pose.pose.position.z
             qx, qy, qz, qw = pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z, pose.pose.orientation.w
             result_msg.message = (f"Safe Placement Pose found at [x: {x:.3f}, y: {y:.3f}, z: {z:.3f}]\n"
