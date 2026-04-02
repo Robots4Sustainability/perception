@@ -31,13 +31,17 @@ class YoloDetectorLifecycleNode(LifecycleNode):
         self.declare_parameter('model_path', '')           
         self.declare_parameter('conf_threshold', 0.6)      
         self.declare_parameter('device', '')               
-        self.declare_parameter('class_names', ["motor"])          
+        self.declare_parameter('class_names', ["motor"])
+
+        self.PICKABLE_CLASSES     = {'motor', 'motor_grip', 'speaker', 'unit'}
+        self.NON_PICKABLE_CLASSES = {'assembly', 'enclosure', 'wire_plug'}          
 
         # Placeholders for resources
         self.model = None
         self.class_names = None
         self.image_sub = None
         self.annotated_image_pub = None
+        self.pickable_image_pub = None
         self.detection_pub = None
         self.max_dim_pub = None
         self.conf_threshold = 0.6
@@ -90,6 +94,7 @@ class YoloDetectorLifecycleNode(LifecycleNode):
 
             # Lifecycle Publishers
             self.annotated_image_pub = self.create_lifecycle_publisher(Image, '/annotated_image', 10)
+            self.pickable_image_pub  = self.create_lifecycle_publisher(Image, '/annotated_image/pickable', 10)
             self.detection_pub = self.create_lifecycle_publisher(Detection2DArray, '/detections', 10)
             self.max_dim_pub = self.create_lifecycle_publisher(Float32, '/detections/max_dimension', 10)
 
@@ -119,11 +124,12 @@ class YoloDetectorLifecycleNode(LifecycleNode):
         self.get_logger().info("Cleaning up YOLO resources...")
         
         self.destroy_publisher(self.annotated_image_pub)
+        self.destroy_publisher(self.pickable_image_pub)
         self.destroy_publisher(self.detection_pub)
         self.destroy_publisher(self.max_dim_pub)
         self.destroy_subscription(self.image_sub)
 
-        self.annotated_image_pub = self.detection_pub = self.max_dim_pub = self.image_sub = None
+        self.annotated_image_pub = self.pickable_image_pub = self.detection_pub = self.max_dim_pub = self.image_sub = None
         self.model = None
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
@@ -139,29 +145,29 @@ class YoloDetectorLifecycleNode(LifecycleNode):
     def image_callback(self, msg):
         if not self._is_active:
             return
-
+ 
         try:
             cv_image = self.bridge.imgmsg_to_cv2(msg, 'bgr8')
         except Exception as e:
             self.get_logger().error(f'Image conversion error: {e}')
             return
-
+ 
         results = self.model(cv_image, verbose=False)
         
         detection_array_msg = Detection2DArray()
         detection_array_msg.header = msg.header 
-
+ 
         current_frame_max_dim = 0.0
-
+ 
         for result in results:
             filtered_boxes = [box for box in result.boxes if float(box.conf) >= self.conf_threshold]
-
+ 
             if filtered_boxes:
                 box_data = torch.stack([b.data[0] for b in filtered_boxes])
                 result.boxes = Boxes(box_data, orig_shape=result.orig_shape)
             else:
                 result.boxes = Boxes(torch.empty((0, 6)), orig_shape=result.orig_shape)
-
+ 
             annotated_image = result.plot()
             try:
                 annotated_msg = self.bridge.cv2_to_imgmsg(annotated_image, encoding='bgr8')
@@ -169,11 +175,54 @@ class YoloDetectorLifecycleNode(LifecycleNode):
                 self.annotated_image_pub.publish(annotated_msg)
             except Exception as e:
                 self.get_logger().error(f'Annotated image conversion error: {e}')
-
+ 
+            # --- PICKABLE / NON-PICKABLE OVERLAY ---
+            pickable_image = cv_image.copy()
+            for box in filtered_boxes:
+                cls_id     = int(box.cls)
+                class_name = (self.class_names[cls_id]
+                              if self.class_names and cls_id < len(self.class_names)
+                              else self.model.names.get(cls_id, str(cls_id)))
+ 
+                if class_name in self.PICKABLE_CLASSES:
+                    color = (0, 200, 0)        # green
+                    label = f'{class_name} | PICKABLE'
+                elif class_name in self.NON_PICKABLE_CLASSES:
+                    color = (0, 0, 220)        # red
+                    label = f'{class_name} | NON-PICKABLE'
+                else:
+                    color = (180, 180, 180)    # grey — unknown class
+                    label = f'{class_name} | UNKNOWN'
+ 
+                xyxy = box.xyxy.cpu().numpy().flatten().astype(int)
+                x1, y1, x2, y2 = xyxy[0], xyxy[1], xyxy[2], xyxy[3]
+                conf_str = f'{float(box.conf):.2f}'
+ 
+                # Box
+                cv2.rectangle(pickable_image, (x1, y1), (x2, y2), color, 2)
+ 
+                # Label background + text
+                font       = cv2.FONT_HERSHEY_SIMPLEX
+                font_scale = 0.55
+                thickness  = 1
+                full_label = f'{label} {conf_str}'
+                (tw, th), baseline = cv2.getTextSize(full_label, font, font_scale, thickness)
+                cv2.rectangle(pickable_image, (x1, y1 - th - baseline - 4), (x1 + tw + 2, y1), color, -1)
+                cv2.putText(pickable_image, full_label,
+                            (x1 + 1, y1 - baseline - 2),
+                            font, font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
+ 
+            try:
+                pickable_msg = self.bridge.cv2_to_imgmsg(pickable_image, encoding='bgr8')
+                pickable_msg.header = msg.header
+                self.pickable_image_pub.publish(pickable_msg)
+            except Exception as e:
+                self.get_logger().error(f'Pickable image conversion error: {e}')
+ 
             for box in filtered_boxes:
                 detection_msg = Detection2D()
                 detection_msg.header = msg.header
-
+ 
                 hypothesis = ObjectHypothesisWithPose()
                 cls_id = int(box.cls)
                 
@@ -181,11 +230,11 @@ class YoloDetectorLifecycleNode(LifecycleNode):
                     class_name = self.class_names[cls_id]
                 else:
                     class_name = self.model.names.get(cls_id, str(cls_id))
-
+ 
                 hypothesis.hypothesis.class_id = class_name
                 hypothesis.hypothesis.score = float(box.conf)
                 detection_msg.results.append(hypothesis)
-
+ 
                 xywh = box.xywh.cpu().numpy().flatten()
                 w = float(xywh[2])
                 h = float(xywh[3])
@@ -193,16 +242,16 @@ class YoloDetectorLifecycleNode(LifecycleNode):
                 detection_msg.bbox.center.position.y = float(xywh[1])
                 detection_msg.bbox.size_x = w
                 detection_msg.bbox.size_y = h
-
+ 
                 # Track the largest dimension
                 max_dim = max(w, h)
                 if max_dim > current_frame_max_dim:
                     current_frame_max_dim = max_dim
-
+ 
                 detection_array_msg.detections.append(detection_msg)
-
+ 
         self.detection_pub.publish(detection_array_msg)
-
+ 
         if detection_array_msg.detections:
             dim_msg = Float32()
             dim_msg.data = current_frame_max_dim
