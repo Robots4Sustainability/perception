@@ -380,6 +380,7 @@ class PerceptionDispatcher(Node):
             result_msg.message = f"Successfully detected {display_label} at [x: {x:.3f}, y: {y:.3f}, z: {z:.3f}]"
             if radius is not None:
                 result_msg.message += f" | Radius: {radius:.4f}m"
+                result_msg.estimated_value = radius
         else:
             result_msg.success, result_msg.message = False, f"Vision timeout: {display_label} not found."
 
