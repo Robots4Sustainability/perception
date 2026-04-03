@@ -52,6 +52,7 @@ setup(
 
 
             ##Other
+            "asjad_node = perception.asjad_table_height:main",
             # "obb_node = perception.obb_object_detection:main",
             # "pose_obb_node = perception.obb_pose_pca:main",
 
