@@ -63,7 +63,7 @@ python brain_client.py car_objects motor_grip 0.0
 # Option B — Send a direct task command
 ros2 action send_goal /run_perception_pipeline   my_robot_interfaces/action/RunVision   "{task_name: 'car_objects', object_class: 'motor_grip'}"   --feedback
 ```
-📖 [Action Server & Brain Client Wiki](https://github.com/Robots4Sustainability/perception/wiki/Action-Server-&-Brain-Client)
+📖 [Action Server & Brain Client Wiki](https://github.com/Robots4Sustainability/perception/wiki/Action-Server-and-Brain-Client)
  
 ---
  
